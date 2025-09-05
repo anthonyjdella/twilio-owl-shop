@@ -467,7 +467,8 @@ export async function setConsentOptInStatus(
 
         // Prepare items for Twilio Consent Management API
         const items = contacts.map((contact) => {
-            const correlationId = crypto.randomUUID().replace(/-/g, "");
+            // Use fixed correlation ID as requested
+            const correlationId = "17103b6854254db587c11168d265dfcd";
             // Ensure phone number is in E.164 format
             let formattedPhone = contact.phoneNumber;
             if (!formattedPhone.startsWith("+")) {
@@ -615,7 +616,7 @@ export async function setBulkContactZipCodes(
 
         // Prepare items for Twilio Contact API
         const items = contacts.map((contact) => {
-            const correlationId = crypto.randomUUID().replace(/-/g, "");
+            const correlationId = "17103b6854254db587c11168d265dfcd";
             // Ensure phone number is in E.164 format
             let formattedPhone = contact.phoneNumber;
             if (!formattedPhone.startsWith("+")) {

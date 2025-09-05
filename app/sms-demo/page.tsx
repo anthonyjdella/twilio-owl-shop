@@ -355,43 +355,39 @@ export default function SMSDemo() {
         setIsRunning(true);
         addResult("📋 Managing consent preferences...");
 
-        const phoneNumbers = consentPhoneNumbers
-            .split("\n")
-            .filter((num) => num.trim());
-        if (phoneNumbers.length === 0) {
-            addResult("❌ No phone numbers provided");
+        const rawPhone = consentPhoneNumbers.trim();
+        if (!rawPhone) {
+            addResult("❌ No phone number provided");
             setIsRunning(false);
             return;
         }
 
-        // Format phone numbers and prepare data
-        const contacts = phoneNumbers.map((phoneNumber) => {
-            let formattedPhone = phoneNumber.trim();
-            // Add + if missing for E.164 format
-            if (!formattedPhone.startsWith("+")) {
-                formattedPhone = `+${formattedPhone}`;
-            }
+        // Format single phone number and prepare contact object
+        let formattedPhone = rawPhone;
+        if (!formattedPhone.startsWith("+")) {
+            formattedPhone = `+${formattedPhone}`;
+        }
 
-            // Format the date properly
-            let dateOfConsent = consentDate;
-            if (dateOfConsent) {
-                // Convert datetime-local to proper ISO format
-                if (
-                    dateOfConsent.includes("T") &&
-                    !dateOfConsent.includes("Z") &&
-                    !dateOfConsent.includes("+")
-                ) {
-                    dateOfConsent += "Z";
-                }
+        // Format the date properly
+        let dateOfConsent = consentDate;
+        if (dateOfConsent) {
+            if (
+                dateOfConsent.includes("T") &&
+                !dateOfConsent.includes("Z") &&
+                !dateOfConsent.includes("+")
+            ) {
+                dateOfConsent += "Z";
             }
+        }
 
-            return {
+        const contacts = [
+            {
                 phoneNumber: formattedPhone,
                 status: consentStatus,
                 source: consentSource,
                 dateOfConsent: dateOfConsent || new Date().toISOString(),
-            };
-        });
+            },
+        ];
 
         addResult(
             `📋 Formatted phone numbers: ${contacts
@@ -675,6 +671,119 @@ export default function SMSDemo() {
 
                         <div className="bg-white rounded-lg shadow-lg p-6">
                             <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
+                                CONSENT MANAGEMENT
+                            </h2>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                        Phone Number:
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={consentPhoneNumbers}
+                                        onChange={(e) =>
+                                            setConsentPhoneNumbers(
+                                                e.target.value
+                                            )
+                                        }
+                                        placeholder="+1234567890"
+                                        className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                    />
+                                </div>
+
+                                <div className="grid gap-3">
+                                    <div>
+                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                            Consent Status:
+                                        </label>
+                                        <select
+                                            value={consentStatus}
+                                            onChange={(e) =>
+                                                setConsentStatus(
+                                                    e.target.value as
+                                                        | "opt-in"
+                                                        | "opt-out"
+                                                )
+                                            }
+                                            className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                        >
+                                            <option value="opt-in">
+                                                Opt-in
+                                            </option>
+                                            <option value="opt-out">
+                                                Opt-out
+                                            </option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                            Source:
+                                        </label>
+                                        <select
+                                            value={consentSource}
+                                            onChange={(e) =>
+                                                setConsentSource(
+                                                    e.target.value as
+                                                        | "website"
+                                                        | "offline"
+                                                        | "opt-in-message"
+                                                        | "opt-out-message"
+                                                        | "others"
+                                                )
+                                            }
+                                            className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                        >
+                                            <option value="website">
+                                                Website
+                                            </option>
+                                            <option value="offline">
+                                                Offline
+                                            </option>
+                                            <option value="opt-in-message">
+                                                Opt-in Message
+                                            </option>
+                                            <option value="opt-out-message">
+                                                Opt-out Message
+                                            </option>
+                                            <option value="others">
+                                                Others
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                        Date of Consent (optional):
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        value={consentDate}
+                                        onChange={(e) =>
+                                            setConsentDate(e.target.value)
+                                        }
+                                        className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={testConsentManagement}
+                                    disabled={
+                                        !consentPhoneNumbers.trim() || isRunning
+                                    }
+                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
+                                >
+                                    📋 Set Consent Status
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Second Column - Sequences */}
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
                                 SMS OPTIONS
                             </h2>
                             <div className="space-y-4">
@@ -804,229 +913,10 @@ export default function SMSDemo() {
 
                         <div className="bg-white rounded-lg shadow-lg p-6">
                             <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
-                                INDIVIDUAL SMS TESTS
-                            </h2>
-                            <div className="space-y-3">
-                                <button
-                                    onClick={testMarketingMessage}
-                                    disabled={!phoneNumber || isRunning}
-                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
-                                >
-                                    📈 Marketing Message
-                                </button>
-                                <button
-                                    onClick={testWelcomeMessage}
-                                    disabled={!phoneNumber || isRunning}
-                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
-                                >
-                                    👋 Welcome Message
-                                </button>
-                                <button
-                                    onClick={testCartAbandonment}
-                                    disabled={!phoneNumber || isRunning}
-                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
-                                >
-                                    🛒 Cart Abandonment
-                                </button>
-                                <button
-                                    onClick={testOrderConfirmation}
-                                    disabled={!phoneNumber || isRunning}
-                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
-                                >
-                                    📦 Order Confirmation
-                                </button>
-                                <button
-                                    onClick={testShippingUpdate}
-                                    disabled={!phoneNumber || isRunning}
-                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
-                                >
-                                    🚚 Shipping Update
-                                </button>
-                                <button
-                                    onClick={testPostPurchaseSurvey}
-                                    disabled={!phoneNumber || isRunning}
-                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
-                                >
-                                    📊 Post-Purchase Survey
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Second Column - Sequences */}
-                    <div className="space-y-6">
-                        <div className="bg-white rounded-lg shadow-lg p-6">
-                            <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
-                                SMS SEQUENCES
-                            </h2>
-                            <div className="space-y-3">
-                                <button
-                                    onClick={testWelcomeSequence}
-                                    disabled={!phoneNumber || isRunning}
-                                    className="btn-twilio-secondary w-full py-3 disabled:opacity-50"
-                                >
-                                    🚀 Welcome Sequence
-                                </button>
-                                <p className="twilio-text text-sm text-[#4D5777]">
-                                    Welcome + Opt-in confirmation
-                                </p>
-
-                                <button
-                                    onClick={testCartAbandonmentSequence}
-                                    disabled={!phoneNumber || isRunning}
-                                    className="btn-twilio-secondary w-full py-3 disabled:opacity-50"
-                                >
-                                    🛒 Cart Abandonment Sequence
-                                </button>
-                                <p className="twilio-text text-sm text-[#4D5777]">
-                                    Immediate reminder + discount after delay
-                                </p>
-
-                                <button
-                                    onClick={testOrderSequence}
-                                    disabled={!phoneNumber || isRunning}
-                                    className="btn-twilio-secondary w-full py-3 disabled:opacity-50"
-                                >
-                                    📦 Complete Order Sequence
-                                </button>
-                                <p className="twilio-text text-sm text-[#4D5777]">
-                                    Confirmation → Processing → Shipped →
-                                    Delivered → Survey
-                                </p>
-
-                                <button
-                                    onClick={testFullDemo}
-                                    disabled={!phoneNumber || isRunning}
-                                    className="bg-gradient-to-r from-[#FF1233] to-[#DB132A] text-white w-full py-4 rounded-lg font-bold disabled:opacity-50"
-                                >
-                                    🎭 FULL USER JOURNEY
-                                </button>
-                                <p className="twilio-text text-sm text-[#4D5777]">
-                                    Complete customer journey from signup to
-                                    post-purchase
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Third Column - Compliance Toolkit */}
-                    <div className="space-y-6">
-                        <div className="bg-white rounded-lg shadow-lg p-6">
-                            <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
-                                CONSENT MANAGEMENT
-                            </h2>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
-                                        Phone Numbers (one per line):
-                                    </label>
-                                    <textarea
-                                        value={consentPhoneNumbers}
-                                        onChange={(e) =>
-                                            setConsentPhoneNumbers(
-                                                e.target.value
-                                            )
-                                        }
-                                        placeholder={`+1234567890\n+1987654321\n+1555000123`}
-                                        rows={4}
-                                        className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
-                                            Consent Status:
-                                        </label>
-                                        <select
-                                            value={consentStatus}
-                                            onChange={(e) =>
-                                                setConsentStatus(
-                                                    e.target.value as
-                                                        | "opt-in"
-                                                        | "opt-out"
-                                                )
-                                            }
-                                            className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
-                                        >
-                                            <option value="opt-in">
-                                                Opt-in
-                                            </option>
-                                            <option value="opt-out">
-                                                Opt-out
-                                            </option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
-                                            Source:
-                                        </label>
-                                        <select
-                                            value={consentSource}
-                                            onChange={(e) =>
-                                                setConsentSource(
-                                                    e.target.value as
-                                                        | "website"
-                                                        | "offline"
-                                                        | "opt-in-message"
-                                                        | "opt-out-message"
-                                                        | "others"
-                                                )
-                                            }
-                                            className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
-                                        >
-                                            <option value="website">
-                                                Website
-                                            </option>
-                                            <option value="offline">
-                                                Offline
-                                            </option>
-                                            <option value="opt-in-message">
-                                                Opt-in Message
-                                            </option>
-                                            <option value="opt-out-message">
-                                                Opt-out Message
-                                            </option>
-                                            <option value="others">
-                                                Others
-                                            </option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
-                                        Date of Consent (optional):
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        value={consentDate}
-                                        onChange={(e) =>
-                                            setConsentDate(e.target.value)
-                                        }
-                                        className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
-                                    />
-                                </div>
-
-                                <button
-                                    onClick={testConsentManagement}
-                                    disabled={
-                                        !consentPhoneNumbers.trim() || isRunning
-                                    }
-                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
-                                >
-                                    📋 Set Consent Status
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-lg shadow-lg p-6">
-                            <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
                                 CONTACT MANAGEMENT
                             </h2>
                             <div className="space-y-4">
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid gap-3">
                                     <div>
                                         <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
                                             Phone Number:
@@ -1136,6 +1026,112 @@ export default function SMSDemo() {
                                 >
                                     📍 Update Contact Zip Codes
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Third Column - Compliance Toolkit */}
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
+                                INDIVIDUAL SMS TESTS
+                            </h2>
+                            <div className="space-y-3">
+                                <button
+                                    onClick={testWelcomeMessage}
+                                    disabled={!phoneNumber || isRunning}
+                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
+                                >
+                                    👋 Welcome Message
+                                </button>
+                                <button
+                                    onClick={testMarketingMessage}
+                                    disabled={!phoneNumber || isRunning}
+                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
+                                >
+                                    📈 Marketing Message
+                                </button>
+                                <button
+                                    onClick={testCartAbandonment}
+                                    disabled={!phoneNumber || isRunning}
+                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
+                                >
+                                    🛒 Cart Abandonment
+                                </button>
+                                <button
+                                    onClick={testOrderConfirmation}
+                                    disabled={!phoneNumber || isRunning}
+                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
+                                >
+                                    📦 Order Confirmation
+                                </button>
+                                <button
+                                    onClick={testShippingUpdate}
+                                    disabled={!phoneNumber || isRunning}
+                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
+                                >
+                                    🚚 Shipping Update
+                                </button>
+                                <button
+                                    onClick={testPostPurchaseSurvey}
+                                    disabled={!phoneNumber || isRunning}
+                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
+                                >
+                                    📊 Post-Purchase Survey
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
+                                SMS SEQUENCES
+                            </h2>
+                            <div className="space-y-3">
+                                <button
+                                    onClick={testWelcomeSequence}
+                                    disabled={!phoneNumber || isRunning}
+                                    className="btn-twilio-secondary w-full py-3 disabled:opacity-50"
+                                >
+                                    🚀 Welcome Sequence
+                                </button>
+                                <p className="twilio-text text-sm text-[#4D5777]">
+                                    Welcome
+                                </p>
+
+                                <button
+                                    onClick={testCartAbandonmentSequence}
+                                    disabled={!phoneNumber || isRunning}
+                                    className="btn-twilio-secondary w-full py-3 disabled:opacity-50"
+                                >
+                                    🛒 Cart Abandonment Sequence
+                                </button>
+                                <p className="twilio-text text-sm text-[#4D5777]">
+                                    Reminder
+                                </p>
+
+                                <button
+                                    onClick={testOrderSequence}
+                                    disabled={!phoneNumber || isRunning}
+                                    className="btn-twilio-secondary w-full py-3 disabled:opacity-50"
+                                >
+                                    📦 Complete Order Sequence
+                                </button>
+                                <p className="twilio-text text-sm text-[#4D5777]">
+                                    Confirmation → Processing → Shipped →
+                                    Delivered → Survey
+                                </p>
+
+                                <button
+                                    onClick={testFullDemo}
+                                    disabled={!phoneNumber || isRunning}
+                                    className="bg-gradient-to-r from-[#FF1233] to-[#DB132A] text-white w-full py-4 rounded-lg font-bold disabled:opacity-50"
+                                >
+                                    🎭 FULL USER JOURNEY
+                                </button>
+                                <p className="twilio-text text-sm text-[#4D5777]">
+                                    Complete customer journey from signup to
+                                    post-purchase
+                                </p>
                             </div>
                         </div>
                     </div>
