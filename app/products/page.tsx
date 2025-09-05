@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { products } from "../../data/products";
 import { Product, Filter } from "../../types";
 import ProductCard from "../../components/ui/ProductCard";
 import ProductFilters from "../../components/ui/ProductFilters";
 
-export default function ProductsPage() {
+function ProductsContent() {
     const searchParams = useSearchParams();
     const [filteredProducts, setFilteredProducts] =
         useState<Product[]>(products);
@@ -204,5 +204,22 @@ export default function ProductsPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function ProductsPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="text-6xl mb-4">⏳</div>
+                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                        Loading Products...
+                    </h1>
+                </div>
+            </div>
+        }>
+            <ProductsContent />
+        </Suspense>
     );
 }
