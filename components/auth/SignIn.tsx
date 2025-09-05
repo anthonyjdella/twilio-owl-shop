@@ -103,7 +103,7 @@ export default function SignIn({ onSuccess, onSwitchToSignUp }: SignInProps) {
 
             {onSwitchToSignUp && (
                 <p className="text-center mt-4 text-sm text-[#4D5777]">
-                    Don't have an account?{" "}
+                    Don&apos;t have an account?{" "}
                     <button
                         onClick={onSwitchToSignUp}
                         className="text-[#FF1233] hover:underline font-medium"
@@ -119,7 +119,7 @@ export default function SignIn({ onSuccess, onSwitchToSignUp }: SignInProps) {
                 </p>
                 <p className="text-xs text-blue-600">
                     Since this is a demo without a database, just enter any
-                    email address that you've previously used to create an
+                    email address that you&apos;ve previously used to create an
                     account. The password field is for display only.
                 </p>
             </div>
