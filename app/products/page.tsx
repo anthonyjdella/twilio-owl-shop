@@ -209,16 +209,18 @@ function ProductsContent() {
 
 export default function ProductsPage() {
     return (
-        <Suspense fallback={
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="text-6xl mb-4">⏳</div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                        Loading Products...
-                    </h1>
+        <Suspense
+            fallback={
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="text-6xl mb-4">⏳</div>
+                        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                            Loading Products...
+                        </h1>
+                    </div>
                 </div>
-            </div>
-        }>
+            }
+        >
             <ProductsContent />
         </Suspense>
     );

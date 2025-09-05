@@ -18,6 +18,42 @@ export default function SMSDemo() {
         demo: true,
     });
 
+    // SMS Options state
+    const [riskCheck, setRiskCheck] = useState<"enable" | "disable">("enable");
+    const [messageIntent, setMessageIntent] = useState<
+        | "otp"
+        | "notifications"
+        | "fraud"
+        | "security"
+        | "customercare"
+        | "delivery"
+        | "education"
+        | "events"
+        | "polling"
+        | "announcements"
+        | "marketing"
+    >("marketing");
+    const [useRiskCheck, setUseRiskCheck] = useState(false);
+    const [useMessageIntent, setUseMessageIntent] = useState(false);
+
+    // Consent Management state
+    const [consentPhoneNumbers, setConsentPhoneNumbers] = useState("");
+    const [consentStatus, setConsentStatus] = useState<"opt-in" | "opt-out">(
+        "opt-in"
+    );
+    const [consentSource, setConsentSource] = useState<
+        "website" | "offline" | "opt-in-message" | "opt-out-message" | "others"
+    >("website");
+    const [consentDate, setConsentDate] = useState("");
+
+    // Contact Management state - separate fields
+    const [contactPhoneNumber, setContactPhoneNumber] = useState("");
+    const [contactZipCode, setContactZipCode] = useState("");
+    const [contactCountryCode, setContactCountryCode] = useState("US");
+    const [bulkContactData, setBulkContactData] = useState<
+        Array<{ phoneNumber: string; zipCode: string; countryCode: string }>
+    >([]);
+
     // Fetch Twilio status on component mount
     useEffect(() => {
         const fetchStatus = async () => {
@@ -46,34 +82,7 @@ export default function SMSDemo() {
         setResults([]);
     };
 
-    // Simple validation - just check if phone number exists and has reasonable length
-    const isValidPhone = () => {
-        return phoneNumber.length >= 10;
-    };
-
-    // Handle masked input - track length changes and build actual phone number
-    const handleMaskedInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const input = e.target.value;
-        const currentLength = phoneNumber.length;
-        const newLength = input.length;
-
-        if (newLength > currentLength) {
-            // User is adding characters - extract only the new character
-            const lastChar = input[input.length - 1];
-            if (/[\d+]/.test(lastChar)) {
-                setPhoneNumber(phoneNumber + lastChar);
-            }
-        } else if (newLength < currentLength) {
-            // User is deleting - remove last character from actual phone number
-            setPhoneNumber(phoneNumber.slice(0, -1));
-        }
-    };
-
-    // Always show masked version in input (like password field)
-    const getMaskedDisplay = () => {
-        if (phoneNumber.length === 0) return "";
-        return "*".repeat(phoneNumber.length);
-    }; // Helper function to call SMS API
+    // Helper function to call SMS API
     const callSMSAPI = async (
         action: string,
         params: Record<string, unknown> = {}
@@ -127,15 +136,87 @@ export default function SMSDemo() {
     const testMarketingMessage = async () => {
         setIsRunning(true);
         addResult("🚀 Sending marketing message...");
-        const result = await callSMSAPI("marketing");
+
+        const options: {
+            riskCheck?: "enable" | "disable";
+            messageIntent?: string;
+        } = {};
+        if (useRiskCheck) options.riskCheck = riskCheck;
+        if (useMessageIntent) options.messageIntent = messageIntent;
+
+        const result = await callSMSAPI(
+            "marketing",
+            Object.keys(options).length > 0 ? { options } : {}
+        );
+
+        const optionsStr =
+            Object.keys(options).length > 0
+                ? ` (${Object.entries(options)
+                      .map(([k, v]) => `${k}: ${v}`)
+                      .join(", ")})`
+                : "";
+
         addResult(
             result.success
-                ? "✅ Marketing SMS sent"
+                ? `✅ Marketing SMS sent${optionsStr}`
                 : `❌ Failed: ${result.error}`
         );
+
+        // Log detailed Twilio response
+        addResult(`📋 Full Twilio Response:`);
+        addResult(`   SID: ${result.sid || "N/A"}`);
+        addResult(`   Demo Mode: ${result.demo ? "Yes" : "No"}`);
+        addResult(`   Status: ${result.success ? "Success" : "Failed"}`);
+
+        // Show enhanced Twilio response details if available
+        if (result.twilioResponse) {
+            addResult(`   📱 Enhanced Twilio Details:`);
+            addResult(
+                `      Account SID: ${
+                    result.twilioResponse.accountSid || "N/A"
+                }`
+            );
+            addResult(
+                `      Message Status: ${result.twilioResponse.status || "N/A"}`
+            );
+            addResult(
+                `      Date Created: ${
+                    result.twilioResponse.dateCreated || "N/A"
+                }`
+            );
+            addResult(`      From: ${result.twilioResponse.from || "N/A"}`);
+            addResult(`      To: ${result.twilioResponse.to || "N/A"}`);
+            addResult(
+                `      Direction: ${result.twilioResponse.direction || "N/A"}`
+            );
+            addResult(
+                `      Price: ${result.twilioResponse.price || "N/A"} ${
+                    result.twilioResponse.priceUnit || ""
+                }`
+            );
+            addResult(
+                `      Segments: ${result.twilioResponse.numSegments || "N/A"}`
+            );
+        }
+
+        if (result.error) {
+            addResult(`   Error: ${JSON.stringify(result.error, null, 2)}`);
+        }
+        if (result.errorDetails) {
+            addResult(
+                `   Error Details: ${JSON.stringify(
+                    result.errorDetails,
+                    null,
+                    2
+                )}`
+            );
+        }
+        if (Object.keys(options).length > 0) {
+            addResult(`   Options Used: ${JSON.stringify(options, null, 2)}`);
+        }
+        addResult(`   Raw Response: ${JSON.stringify(result, null, 2)}`);
         setIsRunning(false);
     };
-
     const testWelcomeMessage = async () => {
         setIsRunning(true);
         addResult("👋 Sending welcome message...");
@@ -269,6 +350,201 @@ export default function SMSDemo() {
         setIsRunning(false);
     };
 
+    // Consent Management API test
+    const testConsentManagement = async () => {
+        setIsRunning(true);
+        addResult("📋 Managing consent preferences...");
+
+        const phoneNumbers = consentPhoneNumbers
+            .split("\n")
+            .filter((num) => num.trim());
+        if (phoneNumbers.length === 0) {
+            addResult("❌ No phone numbers provided");
+            setIsRunning(false);
+            return;
+        }
+
+        // Format phone numbers and prepare data
+        const contacts = phoneNumbers.map((phoneNumber) => {
+            let formattedPhone = phoneNumber.trim();
+            // Add + if missing for E.164 format
+            if (!formattedPhone.startsWith("+")) {
+                formattedPhone = `+${formattedPhone}`;
+            }
+
+            // Format the date properly
+            let dateOfConsent = consentDate;
+            if (dateOfConsent) {
+                // Convert datetime-local to proper ISO format
+                if (
+                    dateOfConsent.includes("T") &&
+                    !dateOfConsent.includes("Z") &&
+                    !dateOfConsent.includes("+")
+                ) {
+                    dateOfConsent += "Z";
+                }
+            }
+
+            return {
+                phoneNumber: formattedPhone,
+                status: consentStatus,
+                source: consentSource,
+                dateOfConsent: dateOfConsent || new Date().toISOString(),
+            };
+        });
+
+        addResult(
+            `📋 Formatted phone numbers: ${contacts
+                .map((c) => c.phoneNumber)
+                .join(", ")}`
+        );
+        addResult(`📅 Date of consent: ${contacts[0].dateOfConsent}`);
+
+        const result = await callSMSAPI("consent-management", { contacts });
+        addResult(
+            result.success
+                ? `✅ Consent ${consentStatus} set for ${contacts.length} contacts`
+                : `❌ Failed: ${result.error}`
+        );
+
+        // Enhanced logging for debugging
+        addResult(`📋 Detailed Consent Management Response:`);
+        if (result.results && Array.isArray(result.results)) {
+            result.results.forEach(
+                (
+                    item: {
+                        phoneNumber: string;
+                        success: boolean;
+                        errorCode?: number;
+                        errorMessages?: string[];
+                        status: string;
+                        source: string;
+                    },
+                    index: number
+                ) => {
+                    addResult(`   Contact ${index + 1}:`);
+                    addResult(`     Phone: ${item.phoneNumber}`);
+                    addResult(`     Success: ${item.success}`);
+                    addResult(`     Error Code: ${item.errorCode || "None"}`);
+                    addResult(
+                        `     Error Messages: ${JSON.stringify(
+                            item.errorMessages || []
+                        )}`
+                    );
+                    addResult(`     Status: ${item.status}`);
+                    addResult(`     Source: ${item.source}`);
+                }
+            );
+        }
+        addResult(`📋 Raw Response: ${JSON.stringify(result, null, 2)}`);
+        setIsRunning(false);
+    };
+
+    // Contact Management API test
+    const testContactManagement = async () => {
+        setIsRunning(true);
+        addResult("📍 Updating contact zip codes...");
+
+        if (bulkContactData.length === 0) {
+            addResult("❌ No contact data provided");
+            setIsRunning(false);
+            return;
+        }
+
+        // Format phone numbers for E.164 format
+        const contacts = bulkContactData.map((contact) => {
+            let formattedPhone = contact.phoneNumber;
+            // Add + if missing for E.164 format
+            if (!formattedPhone.startsWith("+")) {
+                formattedPhone = `+${formattedPhone}`;
+            }
+
+            return {
+                phoneNumber: formattedPhone,
+                zipCode: contact.zipCode,
+                countryIsoCode: contact.countryCode,
+            };
+        });
+
+        addResult(
+            `📍 Formatted contacts: ${contacts
+                .map(
+                    (c) =>
+                        `${c.phoneNumber} -> ${c.zipCode}, ${c.countryIsoCode}`
+                )
+                .join("; ")}`
+        );
+
+        const result = await callSMSAPI("contact-zip-codes", { contacts });
+        addResult(
+            result.success
+                ? `✅ Zip codes updated for ${contacts.length} contacts`
+                : `❌ Failed: ${result.error}`
+        );
+
+        // Enhanced logging for debugging
+        addResult(`📋 Detailed Contact Management Response:`);
+        if (result.results && Array.isArray(result.results)) {
+            result.results.forEach(
+                (
+                    item: {
+                        phoneNumber: string;
+                        success: boolean;
+                        errorCode?: number;
+                        errorMessages?: string[];
+                        zipCode: string;
+                        countryIsoCode: string;
+                    },
+                    index: number
+                ) => {
+                    addResult(`   Contact ${index + 1}:`);
+                    addResult(`     Phone: ${item.phoneNumber}`);
+                    addResult(`     Zip Code: ${item.zipCode}`);
+                    addResult(`     Country: ${item.countryIsoCode}`);
+                    addResult(`     Success: ${item.success}`);
+                    addResult(`     Error Code: ${item.errorCode || "None"}`);
+                    addResult(
+                        `     Error Messages: ${JSON.stringify(
+                            item.errorMessages || []
+                        )}`
+                    );
+                }
+            );
+        }
+        addResult(`📋 Raw Response: ${JSON.stringify(result, null, 2)}`);
+        setIsRunning(false);
+    };
+
+    // Add contact to bulk list
+    const addContactToBulk = () => {
+        if (contactPhoneNumber && contactZipCode) {
+            // Show what format we'll use
+            let formattedPhone = contactPhoneNumber;
+            if (!formattedPhone.startsWith("+")) {
+                formattedPhone = `+${formattedPhone}`;
+            }
+
+            setBulkContactData((prev) => [
+                ...prev,
+                {
+                    phoneNumber: contactPhoneNumber, // Store original input
+                    zipCode: contactZipCode,
+                    countryCode: contactCountryCode,
+                },
+            ]);
+            setContactPhoneNumber("");
+            setContactZipCode("");
+            addResult(
+                `📍 Added contact: ${contactPhoneNumber} (will send as ${formattedPhone}) -> ${contactZipCode}, ${contactCountryCode}`
+            );
+        }
+    };
+
+    // Clear bulk contact list
+    const clearBulkContacts = () => {
+        setBulkContactData([]);
+        addResult("🗑️ Cleared bulk contact list");
+    };
     return (
         <div className="min-h-screen bg-[#DDE0E6] py-12">
             <div className="max-w-6xl mx-auto px-4">
@@ -305,7 +581,7 @@ export default function SMSDemo() {
                             {twilioStatus.accountSid || "Not configured"}
                         </p>
                         <p>
-                            Twilio Number:{" "}
+                            Phone Number:{" "}
                             {twilioStatus.phoneNumber || "Not configured"}
                         </p>
                     </div>
@@ -318,7 +594,7 @@ export default function SMSDemo() {
                 </div>
 
                 {/* Message Types Explanation */}
-                <div className="mt-8 mb-8 bg-white rounded-lg shadow-lg p-6">
+                <div className="mb-8 bg-white rounded-lg shadow-lg p-6">
                     <h3 className="buffalo-title text-xl text-[#000D25] mb-4">
                         SMS MESSAGE JOURNEY
                     </h3>
@@ -381,20 +657,149 @@ export default function SMSDemo() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column - Phone Input & Individual Tests */}
+                <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+                    {/* Left Column - Phone Input & SMS Options */}
                     <div className="space-y-6">
                         <div className="bg-white rounded-lg shadow-lg p-6">
                             <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
                                 PHONE NUMBER
                             </h2>
                             <input
-                                type="tel"
-                                value={getMaskedDisplay()}
-                                onChange={handleMaskedInput}
+                                type="password"
+                                value={phoneNumber}
+                                onChange={(e) => setPhoneNumber(e.target.value)}
                                 placeholder="+1234567890"
                                 className="twilio-text w-full px-4 py-3 border border-[#4D5777] rounded-lg focus:ring-2 focus:ring-[#FF1233] focus:border-transparent"
                             />
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
+                                SMS OPTIONS
+                            </h2>
+                            <div className="space-y-4">
+                                <div className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        id="useRiskCheck"
+                                        checked={useRiskCheck}
+                                        onChange={(e) =>
+                                            setUseRiskCheck(e.target.checked)
+                                        }
+                                        className="h-4 w-4 text-[#FF1233] focus:ring-[#FF1233] border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="useRiskCheck"
+                                        className="ml-2 twilio-text text-sm text-[#000D25]"
+                                    >
+                                        Enable Risk Check
+                                    </label>
+                                </div>
+
+                                {useRiskCheck && (
+                                    <div className="pl-6 border-l-2 border-[#FF1233]">
+                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                            Risk Check:
+                                        </label>
+                                        <select
+                                            value={riskCheck}
+                                            onChange={(e) =>
+                                                setRiskCheck(
+                                                    e.target.value as
+                                                        | "enable"
+                                                        | "disable"
+                                                )
+                                            }
+                                            className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                        >
+                                            <option value="enable">
+                                                Enable
+                                            </option>
+                                            <option value="disable">
+                                                Disable
+                                            </option>
+                                        </select>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        id="useMessageIntent"
+                                        checked={useMessageIntent}
+                                        onChange={(e) =>
+                                            setUseMessageIntent(
+                                                e.target.checked
+                                            )
+                                        }
+                                        className="h-4 w-4 text-[#FF1233] focus:ring-[#FF1233] border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="useMessageIntent"
+                                        className="ml-2 twilio-text text-sm text-[#000D25]"
+                                    >
+                                        Enable Message Intent
+                                    </label>
+                                </div>
+
+                                {useMessageIntent && (
+                                    <div className="pl-6 border-l-2 border-[#FF1233]">
+                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                            Message Intent:
+                                        </label>
+                                        <select
+                                            value={messageIntent}
+                                            onChange={(e) =>
+                                                setMessageIntent(
+                                                    e.target.value as
+                                                        | "otp"
+                                                        | "notifications"
+                                                        | "fraud"
+                                                        | "security"
+                                                        | "customercare"
+                                                        | "delivery"
+                                                        | "education"
+                                                        | "events"
+                                                        | "polling"
+                                                        | "announcements"
+                                                        | "marketing"
+                                                )
+                                            }
+                                            className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                        >
+                                            <option value="otp">OTP</option>
+                                            <option value="notifications">
+                                                Notifications
+                                            </option>
+                                            <option value="fraud">Fraud</option>
+                                            <option value="security">
+                                                Security
+                                            </option>
+                                            <option value="customercare">
+                                                Customer Care
+                                            </option>
+                                            <option value="delivery">
+                                                Delivery
+                                            </option>
+                                            <option value="education">
+                                                Education
+                                            </option>
+                                            <option value="events">
+                                                Events
+                                            </option>
+                                            <option value="polling">
+                                                Polling
+                                            </option>
+                                            <option value="announcements">
+                                                Announcements
+                                            </option>
+                                            <option value="marketing">
+                                                Marketing
+                                            </option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="bg-white rounded-lg shadow-lg p-6">
@@ -404,42 +809,42 @@ export default function SMSDemo() {
                             <div className="space-y-3">
                                 <button
                                     onClick={testMarketingMessage}
-                                    disabled={!isValidPhone() || isRunning}
+                                    disabled={!phoneNumber || isRunning}
                                     className="btn-twilio-primary w-full py-3 disabled:opacity-50"
                                 >
                                     📈 Marketing Message
                                 </button>
                                 <button
                                     onClick={testWelcomeMessage}
-                                    disabled={!isValidPhone() || isRunning}
+                                    disabled={!phoneNumber || isRunning}
                                     className="btn-twilio-primary w-full py-3 disabled:opacity-50"
                                 >
                                     👋 Welcome Message
                                 </button>
                                 <button
                                     onClick={testCartAbandonment}
-                                    disabled={!isValidPhone() || isRunning}
+                                    disabled={!phoneNumber || isRunning}
                                     className="btn-twilio-primary w-full py-3 disabled:opacity-50"
                                 >
                                     🛒 Cart Abandonment
                                 </button>
                                 <button
                                     onClick={testOrderConfirmation}
-                                    disabled={!isValidPhone() || isRunning}
+                                    disabled={!phoneNumber || isRunning}
                                     className="btn-twilio-primary w-full py-3 disabled:opacity-50"
                                 >
                                     📦 Order Confirmation
                                 </button>
                                 <button
                                     onClick={testShippingUpdate}
-                                    disabled={!isValidPhone() || isRunning}
+                                    disabled={!phoneNumber || isRunning}
                                     className="btn-twilio-primary w-full py-3 disabled:opacity-50"
                                 >
                                     🚚 Shipping Update
                                 </button>
                                 <button
                                     onClick={testPostPurchaseSurvey}
-                                    disabled={!isValidPhone() || isRunning}
+                                    disabled={!phoneNumber || isRunning}
                                     className="btn-twilio-primary w-full py-3 disabled:opacity-50"
                                 >
                                     📊 Post-Purchase Survey
@@ -448,7 +853,7 @@ export default function SMSDemo() {
                         </div>
                     </div>
 
-                    {/* Middle Column - Sequence Tests */}
+                    {/* Second Column - Sequences */}
                     <div className="space-y-6">
                         <div className="bg-white rounded-lg shadow-lg p-6">
                             <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
@@ -457,41 +862,41 @@ export default function SMSDemo() {
                             <div className="space-y-3">
                                 <button
                                     onClick={testWelcomeSequence}
-                                    disabled={!isValidPhone() || isRunning}
+                                    disabled={!phoneNumber || isRunning}
                                     className="btn-twilio-secondary w-full py-3 disabled:opacity-50"
                                 >
                                     🚀 Welcome Sequence
                                 </button>
                                 <p className="twilio-text text-sm text-[#4D5777]">
-                                    Welcome message only
+                                    Welcome + Opt-in confirmation
                                 </p>
 
                                 <button
                                     onClick={testCartAbandonmentSequence}
-                                    disabled={!isValidPhone() || isRunning}
+                                    disabled={!phoneNumber || isRunning}
                                     className="btn-twilio-secondary w-full py-3 disabled:opacity-50"
                                 >
                                     🛒 Cart Abandonment Sequence
                                 </button>
                                 <p className="twilio-text text-sm text-[#4D5777]">
-                                    Single cart abandonment reminder
+                                    Immediate reminder + discount after delay
                                 </p>
 
                                 <button
                                     onClick={testOrderSequence}
-                                    disabled={!isValidPhone() || isRunning}
+                                    disabled={!phoneNumber || isRunning}
                                     className="btn-twilio-secondary w-full py-3 disabled:opacity-50"
                                 >
                                     📦 Complete Order Sequence
                                 </button>
                                 <p className="twilio-text text-sm text-[#4D5777]">
-                                    Confirmation → Payment → Shipped → Delivered
-                                    → Survey
+                                    Confirmation → Processing → Shipped →
+                                    Delivered → Survey
                                 </p>
 
                                 <button
                                     onClick={testFullDemo}
-                                    disabled={!isValidPhone() || isRunning}
+                                    disabled={!phoneNumber || isRunning}
                                     className="bg-gradient-to-r from-[#FF1233] to-[#DB132A] text-white w-full py-4 rounded-lg font-bold disabled:opacity-50"
                                 >
                                     🎭 FULL USER JOURNEY
@@ -504,7 +909,238 @@ export default function SMSDemo() {
                         </div>
                     </div>
 
-                    {/* Right Column - Results Log */}
+                    {/* Third Column - Compliance Toolkit */}
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
+                                CONSENT MANAGEMENT
+                            </h2>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                        Phone Numbers (one per line):
+                                    </label>
+                                    <textarea
+                                        value={consentPhoneNumbers}
+                                        onChange={(e) =>
+                                            setConsentPhoneNumbers(
+                                                e.target.value
+                                            )
+                                        }
+                                        placeholder={`+1234567890\n+1987654321\n+1555000123`}
+                                        rows={4}
+                                        className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                            Consent Status:
+                                        </label>
+                                        <select
+                                            value={consentStatus}
+                                            onChange={(e) =>
+                                                setConsentStatus(
+                                                    e.target.value as
+                                                        | "opt-in"
+                                                        | "opt-out"
+                                                )
+                                            }
+                                            className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                        >
+                                            <option value="opt-in">
+                                                Opt-in
+                                            </option>
+                                            <option value="opt-out">
+                                                Opt-out
+                                            </option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                            Source:
+                                        </label>
+                                        <select
+                                            value={consentSource}
+                                            onChange={(e) =>
+                                                setConsentSource(
+                                                    e.target.value as
+                                                        | "website"
+                                                        | "offline"
+                                                        | "opt-in-message"
+                                                        | "opt-out-message"
+                                                        | "others"
+                                                )
+                                            }
+                                            className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                        >
+                                            <option value="website">
+                                                Website
+                                            </option>
+                                            <option value="offline">
+                                                Offline
+                                            </option>
+                                            <option value="opt-in-message">
+                                                Opt-in Message
+                                            </option>
+                                            <option value="opt-out-message">
+                                                Opt-out Message
+                                            </option>
+                                            <option value="others">
+                                                Others
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                        Date of Consent (optional):
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        value={consentDate}
+                                        onChange={(e) =>
+                                            setConsentDate(e.target.value)
+                                        }
+                                        className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={testConsentManagement}
+                                    disabled={
+                                        !consentPhoneNumbers.trim() || isRunning
+                                    }
+                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
+                                >
+                                    📋 Set Consent Status
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
+                                CONTACT MANAGEMENT
+                            </h2>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                            Phone Number:
+                                        </label>
+                                        <input
+                                            type="password"
+                                            value={contactPhoneNumber}
+                                            onChange={(e) =>
+                                                setContactPhoneNumber(
+                                                    e.target.value
+                                                )
+                                            }
+                                            placeholder="+1234567890"
+                                            className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                            Zip Code:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={contactZipCode}
+                                            onChange={(e) =>
+                                                setContactZipCode(
+                                                    e.target.value
+                                                )
+                                            }
+                                            placeholder="12345"
+                                            className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                            Country:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={contactCountryCode}
+                                            onChange={(e) =>
+                                                setContactCountryCode(
+                                                    e.target.value
+                                                )
+                                            }
+                                            placeholder="US"
+                                            className="twilio-text w-full px-3 py-2 border border-[#4D5777] rounded focus:ring-2 focus:ring-[#FF1233]"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={addContactToBulk}
+                                        disabled={
+                                            !contactPhoneNumber ||
+                                            !contactZipCode ||
+                                            isRunning
+                                        }
+                                        className="btn-twilio-secondary flex-1 py-2 disabled:opacity-50"
+                                    >
+                                        ➕ Add to List
+                                    </button>
+                                    <button
+                                        onClick={clearBulkContacts}
+                                        disabled={
+                                            bulkContactData.length === 0 ||
+                                            isRunning
+                                        }
+                                        className="btn-twilio-secondary flex-1 py-2 disabled:opacity-50"
+                                    >
+                                        🗑️ Clear List
+                                    </button>
+                                </div>
+
+                                {bulkContactData.length > 0 && (
+                                    <div>
+                                        <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
+                                            Contact List (
+                                            {bulkContactData.length} contacts):
+                                        </label>
+                                        <div className="bg-gray-50 rounded p-3 max-h-32 overflow-y-auto">
+                                            {bulkContactData.map(
+                                                (contact, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="twilio-text text-sm text-[#4D5777]"
+                                                    >
+                                                        •••••••••• →{" "}
+                                                        {contact.zipCode},{" "}
+                                                        {contact.countryCode}
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={testContactManagement}
+                                    disabled={
+                                        bulkContactData.length === 0 ||
+                                        isRunning
+                                    }
+                                    className="btn-twilio-primary w-full py-3 disabled:opacity-50"
+                                >
+                                    📍 Update Contact Zip Codes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Fourth Column - Results Log */}
                     <div className="space-y-6">
                         <div className="bg-white rounded-lg shadow-lg p-6">
                             <div className="flex justify-between items-center mb-4">
