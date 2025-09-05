@@ -546,7 +546,7 @@ export default function SMSDemo() {
             <div className="max-w-6xl mx-auto px-4">
                 <div className="text-center mb-8">
                     <h1 className="buffalo-title text-4xl text-[#000D25] mb-4">
-                        TWILIO SMS INTEGRATION DEMO
+                        TWILIO COMPLIANCE TOOLKIT DEMO
                     </h1>
                     <p className="twilio-text text-lg text-[#4D5777]">
                         Test the complete Owl Shop SMS customer journey powered
@@ -671,8 +671,13 @@ export default function SMSDemo() {
 
                         <div className="bg-white rounded-lg shadow-lg p-6">
                             <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
-                                CONSENT MANAGEMENT
+                                CONSENT API
                             </h2>
+                            <h3 className="twilio-text font-semibold text-sm text-[#000D25]">
+                                <a href="https://www.twilio.com/docs/messaging/features/consent-api">
+                                    (docs)
+                                </a>
+                            </h3>
                             <div className="space-y-4">
                                 <div>
                                     <label className="twilio-text text-sm font-medium text-[#000D25] block mb-1">
@@ -913,8 +918,13 @@ export default function SMSDemo() {
 
                         <div className="bg-white rounded-lg shadow-lg p-6">
                             <h2 className="buffalo-title text-xl text-[#000D25] mb-4">
-                                CONTACT MANAGEMENT
+                                CONTACT API
                             </h2>
+                            <h3 className="twilio-text font-semibold text-sm text-[#000D25]">
+                                <a href="https://www.twilio.com/docs/messaging/features/contact-api">
+                                    (docs)
+                                </a>
+                            </h3>
                             <div className="space-y-4">
                                 <div className="grid gap-3">
                                     <div>

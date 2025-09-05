@@ -49,40 +49,30 @@ async function sendSMS(to: string, body: string, options?: SMSOptions) {
             return { success: true, sid: `demo_${Date.now()}`, demo: true };
         }
 
+        // If MessageIntent is provided, use direct HTTP API call since SDK doesn't support it
+        if (options?.messageIntent) {
+            return await sendSMSWithCurl(to, body, options);
+        }
+
         const messageParams: {
             body: string;
             from: string | undefined;
             to: string;
             riskCheck?: "enable" | "disable";
-            messageIntent?:
-                | "otp"
-                | "notifications"
-                | "fraud"
-                | "security"
-                | "customercare"
-                | "delivery"
-                | "education"
-                | "events"
-                | "polling"
-                | "announcements"
-                | "marketing";
         } = {
             body,
             from: twilioPhoneNumber,
             to,
         };
 
-        // Add optional parameters if provided
+        // Add optional parameters if provided (excluding messageIntent since SDK doesn't support it)
         if (options?.riskCheck) {
             messageParams.riskCheck = options.riskCheck;
-        }
-        if (options?.messageIntent) {
-            messageParams.messageIntent = options.messageIntent;
         }
 
         // Log what we're sending to Twilio
         console.log(
-            "📤 Sending to Twilio API:",
+            "📤 Sending to Twilio SDK:",
             JSON.stringify(messageParams, null, 2)
         );
 
@@ -126,6 +116,73 @@ async function sendSMS(to: string, body: string, options?: SMSOptions) {
             "📱 Full SMS Error Details:",
             JSON.stringify(error, null, 2)
         );
+        return { success: false, error, demo: false, errorDetails: error };
+    }
+}
+
+// Direct HTTP API call for MessageIntent support
+async function sendSMSWithCurl(to: string, body: string, options: SMSOptions) {
+    try {
+        // Prepare form data for the API call
+        const formData = new URLSearchParams({
+            To: to,
+            From: twilioPhoneNumber!,
+            Body: body,
+        });
+
+        // Add MessageIntent if provided
+        if (options.messageIntent) {
+            formData.append("MessageIntent", options.messageIntent);
+        }
+
+        // Add RiskCheck if provided
+        if (options.riskCheck) {
+            formData.append("RiskCheck", options.riskCheck);
+        }
+
+        const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+        const auth = Buffer.from(`${accountSid}:${authToken}`).toString(
+            "base64"
+        );
+
+        console.log("📤 Sending direct HTTP POST to Twilio API:");
+        console.log("   URL:", url);
+        console.log("   Body:", Object.fromEntries(formData.entries()));
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                Authorization: `Basic ${auth}`,
+            },
+            body: formData.toString(),
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+            console.error("❌ Twilio API Error:", responseData);
+            return {
+                success: false,
+                error: responseData,
+                demo: false,
+                errorDetails: responseData,
+            };
+        }
+
+        console.log("✅ SMS sent successfully via HTTP API:", responseData.sid);
+        console.log("📱 Message Status:", responseData.status);
+        console.log("📱 Full HTTP API Response:");
+        console.log(JSON.stringify(responseData, null, 2));
+
+        return {
+            success: true,
+            sid: responseData.sid,
+            demo: false,
+            twilioResponse: responseData,
+        };
+    } catch (error) {
+        console.error("❌ Failed to send SMS via HTTP API:", error);
         return { success: false, error, demo: false, errorDetails: error };
     }
 }

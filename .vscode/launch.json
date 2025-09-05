@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Next: Dev (node --inspect)",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "/Users/adellavecchia/.nvm/versions/node/v23.9.0/bin/node",
+            "runtimeArgs": [
+                "--inspect=9229",
+                "./node_modules/next/dist/bin/next",
+                "dev"
+            ],
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "timeout": 30000
+        },
+        {
+            "name": "Attach to Next (Node)",
+            "type": "node",
+            "request": "attach",
+            "port": 9229,
+            "address": "localhost",
+            "restart": true,
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "${workspaceFolder}",
+            "runtimeExecutable": "/Users/adellavecchia/.nvm/versions/node/v23.9.0/bin/node"
+        },
+        {
+            "name": "Launch Chrome to Debug Client",
+            "type": "chrome",
+            "request": "launch",
+            "url": "http://localhost:3000",
+            "webRoot": "${workspaceFolder}",
+            "userDataDir": "${workspaceFolder}/.vscode/chrome"
+        }
+    ]
+}
