@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,7 +11,7 @@ import {
 import { sendShippingUpdate } from "../../../lib/twilio";
 import { Order } from "../../../types";
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
     const searchParams = useSearchParams();
     const orderNumber = searchParams.get("order");
     const [order, setOrder] = useState<Order | null>(null);
@@ -269,5 +269,22 @@ export default function CheckoutSuccessPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function CheckoutSuccessPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="text-6xl mb-4">⏳</div>
+                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                        Loading...
+                    </h1>
+                </div>
+            </div>
+        }>
+            <CheckoutSuccessContent />
+        </Suspense>
     );
 }
