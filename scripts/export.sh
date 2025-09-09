@@ -48,4 +48,12 @@ if [ -d "public" ]; then
     cp -r public/* out/ 2>/dev/null || true
 fi
 
+# Fix asset paths for GitHub Pages
+if [ "$NODE_ENV" = "production" ]; then
+    echo "Fixing asset paths for GitHub Pages..."
+    find out -name "*.html" -type f -exec sed -i '' 's|href="/_next/|href="/twilio-owl-shop/_next/|g' {} \;
+    find out -name "*.html" -type f -exec sed -i '' 's|src="/_next/|src="/twilio-owl-shop/_next/|g' {} \;
+    echo "Asset paths fixed."
+fi
+
 echo "Static export completed in 'out' directory"
