@@ -4,7 +4,8 @@ A professional, modern e-commerce web application built with Next.js 15, featuri
 
 ## 🚀 Live Demo
 
-Visit the application at: `http://localhost:3001`
+**Production**: [https://your-vercel-url.vercel.app](https://your-vercel-url.vercel.app)  
+**Local Development**: `http://localhost:3000`
 
 ## ✨ Features
 
@@ -186,6 +187,60 @@ twilio-owl-shop/
 5. **Open your browser**
    Navigate to `http://localhost:3000` (or the port shown in terminal)
 
+## 🌐 Production Deployment
+
+### Deploy to Vercel (Recommended)
+
+Vercel provides the best hosting experience for Next.js applications with proper CSS processing and serverless API support.
+
+#### Quick Deploy
+
+1. **Sign up at [vercel.com](https://vercel.com)** with your GitHub account
+2. **Click "New Project"** and import your repository
+3. **Use default settings** - Vercel auto-detects Next.js configuration
+4. **Click "Deploy"** - your app will be live in minutes!
+
+#### Configure Twilio SMS (Optional)
+
+For SMS functionality to work in production:
+
+1. **Go to your Vercel project dashboard**
+2. **Navigate to Settings → Environment Variables**
+3. **Add these variables:**
+   ```
+   TWILIO_ACCOUNT_SID = your_account_sid_here
+   TWILIO_AUTH_TOKEN = your_auth_token_here
+   TWILIO_PHONE_NUMBER = your_twilio_phone_number
+   ```
+4. **Redeploy** your application
+
+> **Note**: Without Twilio credentials, the app runs in demo mode (SMS messages are logged to console instead of being sent).
+
+#### Get Your Twilio Credentials
+
+1. **Sign up at [twilio.com](https://twilio.com)**
+2. **Get a free phone number** from the Twilio Console
+3. **Find your credentials** in Account → Keys & Credentials:
+   - Account SID
+   - Auth Token
+   - Your Twilio phone number
+
+### Alternative Deployment Options
+
+#### GitHub Pages (Static Only)
+*Note: SMS functionality won't work on GitHub Pages as it doesn't support serverless functions*
+
+```bash
+npm run build:static
+# Files will be in 'out' directory for manual upload
+```
+
+#### Other Platforms
+The app can be deployed to any platform supporting Next.js:
+- **Netlify**: Use `npm run build`
+- **Railway**: Auto-detects Next.js
+- **Render**: Use `npm run build && npm start`
+
 ## 🧪 Demo Features
 
 ### Test Accounts
@@ -213,6 +268,7 @@ twilio-owl-shop/
 -   **SMS**: Twilio SDK
 -   **State Management**: React hooks + localStorage
 -   **Build Tool**: Turbopack (Next.js)
+-   **Deployment**: Vercel (recommended), GitHub Pages (static), or any Next.js host
 
 ## 📋 Features Checklist
 
