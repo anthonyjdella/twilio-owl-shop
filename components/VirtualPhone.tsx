@@ -6,7 +6,8 @@ import { DemoConfig, getMessageTheme } from "@/config/demo-config";
 // Extend Window interface to include our custom property
 declare global {
   interface Window {
-    virtualPhoneReceiveMessage?: (content: string, messageId?: string) => void;
+    virtualPhoneReceiveMessage?: (content: string, messageId?: string, channel?: 'sms' | 'rcs' | 'whatsapp', template?: any) => void;
+    virtualPhoneSwitchApp?: (channel: 'sms' | 'rcs' | 'whatsapp') => void;
   }
 }
 
@@ -17,6 +18,12 @@ interface Message {
   sender: 'user' | 'contact';
   delivered: boolean;
   read: boolean;
+  channel?: 'sms' | 'rcs' | 'whatsapp';
+  type?: 'text' | 'quick_replies' | 'carousel' | 'card';
+  template?: any;
+  quickReplies?: Array<{ id: string; title: string }>;
+  carousel?: Array<{ id: string; image: string; title: string; subtitle: string; price: string; buttons: Array<{ title: string; type: string }> }>;
+  card?: { image: string; title: string; subtitle: string; buttons: Array<{ title: string; type: string }> };
 }
 
 interface VirtualPhoneProps {
@@ -27,6 +34,7 @@ interface VirtualPhoneProps {
 export default function VirtualPhone({ config, onMessageReceived }: VirtualPhoneProps) {
   const [currentApp, setCurrentApp] = useState(config.virtualPhone.defaultApp);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [whatsAppMessages, setWhatsAppMessages] = useState<Message[]>([]);
   const [isScreenOn, setIsScreenOn] = useState(true);
   const [currentTime, setCurrentTime] = useState(config.virtualPhone.currentTime);
   const [showContactProfile, setShowContactProfile] = useState(false);
@@ -47,26 +55,115 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   }, []);
 
   // Function to receive a new message from the demo
-  const receiveMessage = useCallback((content: string, messageId?: string) => {
+  const receiveMessage = useCallback((content: string, messageId?: string, channel: 'sms' | 'rcs' | 'whatsapp' = 'sms', template?: any) => {
+    // Create rich message based on template and channel
     const newMessage: Message = {
-      id: messageId || `msg_${Date.now()}`,
+      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       content,
       timestamp: new Date(),
       sender: 'contact',
       delivered: true,
-      read: false
+      read: false,
+      channel,
     };
+
+    // Add rich content for RCS and WhatsApp channels based on selected content type
+    if (channel === 'rcs' || channel === 'whatsapp') {
+      if (template && template.selectedContentType && template.richMessageConfig) {
+        // Use the user-selected content type
+        newMessage.type = template.selectedContentType;
+        
+        // Configure rich content based on the selected type
+        switch (template.selectedContentType) {
+          case 'quick_replies':
+            newMessage.quickReplies = template.richMessageConfig.replies || [
+              { id: '1', title: '🛍️ Shop Now' },
+              { id: '2', title: '📞 Call Us' },
+              { id: '3', title: '💬 Chat' }
+            ];
+            break;
+            
+          case 'card':
+            newMessage.card = {
+              image: template.richMessageConfig.cardImage || '🛒',
+              title: template.richMessageConfig.cardTitle || 'Special Offer!',
+              subtitle: template.richMessageConfig.cardSubtitle || 'Limited time deal - Don\'t miss out!',
+              buttons: template.richMessageConfig.buttons || [
+                { title: 'Shop Now', type: 'url' },
+                { title: 'Learn More', type: 'action' }
+              ]
+            };
+            break;
+            
+          case 'carousel':
+            newMessage.carousel = template.richMessageConfig.items || [
+              {
+                id: '1',
+                image: '🦉',
+                title: 'Owl Hoodie',
+                subtitle: 'Premium comfort hoodie',
+                price: '$49.99',
+                buttons: [{ title: 'Buy Now', type: 'url' }]
+              },
+              {
+                id: '2',
+                image: '👔',
+                title: 'Dev T-Shirt',
+                subtitle: 'Perfect for coding',
+                price: '$29.99',
+                buttons: [{ title: 'Buy Now', type: 'url' }]
+              },
+              {
+                id: '3',
+                image: '☕',
+                title: 'Code Mug',
+                subtitle: 'Fuel your coding',
+                price: '$19.99',
+                buttons: [{ title: 'Buy Now', type: 'url' }]
+              }
+            ];
+            break;
+            
+          case 'media':
+            // Media messages just use text type but could be enhanced with actual media URLs
+            newMessage.type = 'text';
+            break;
+            
+          case 'text':
+          default:
+            newMessage.type = 'text';
+            break;
+        }
+      } else {
+        // Fallback to text if no content type is specified
+        newMessage.type = 'text';
+      }
+    } else {
+      newMessage.type = 'text';
+    }
     
-    setMessages(prev => [...prev, newMessage]);
+    // Route to appropriate app based on channel
+    if (channel === 'whatsapp') {
+      // Add to WhatsApp messages (separate state)
+      setWhatsAppMessages(prev => [...prev, newMessage]);
+      
+      // Switch to WhatsApp app
+      if (currentApp !== 'whatsapp') {
+        setCurrentApp('whatsapp');
+      }
+    } else {
+      // SMS and RCS go to Messages app
+      setMessages(prev => [...prev, newMessage]);
+      
+      // Switch to Messages app
+      if (currentApp !== 'messages') {
+        setCurrentApp('messages');
+      }
+    }
     
     // Notify parent component
     if (onMessageReceived) {
       onMessageReceived(newMessage);
-    }
-
-    // Auto-switch to messages app when receiving a message
-    if (currentApp !== 'messages') {
-      setCurrentApp('messages');
     }
 
     // Simulate phone notification
@@ -75,14 +172,38 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     }
   }, [currentApp, isScreenOn, onMessageReceived]);
 
-  // Expose receiveMessage function globally for the demo to use
+  // Function to switch apps based on channel
+  const switchApp = useCallback((channel: 'sms' | 'rcs' | 'whatsapp') => {
+    // Turn on screen if it's off
+    if (!isScreenOn) {
+      setIsScreenOn(true);
+    }
+    
+    // Switch to appropriate app
+    if (channel === 'whatsapp') {
+      setCurrentApp('whatsapp');
+      // If there are messages, go directly to chat view
+      if (whatsAppMessages.length > 0) {
+        setWhatsAppView('chat');
+      } else {
+        setWhatsAppView('chats');
+      }
+    } else {
+      // SMS and RCS both go to messages app
+      setCurrentApp('messages');
+    }
+  }, [isScreenOn, whatsAppMessages.length]);
+
+  // Expose functions globally for the demo to use
   useEffect(() => {
     window.virtualPhoneReceiveMessage = receiveMessage;
+    window.virtualPhoneSwitchApp = switchApp;
     
     return () => {
       delete window.virtualPhoneReceiveMessage;
+      delete window.virtualPhoneSwitchApp;
     };
-  }, [receiveMessage]);
+  }, [receiveMessage, switchApp]);
 
   const currentTheme = getMessageTheme(config, config.virtualPhone.messageTheme);
 
@@ -268,38 +389,120 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                 <p className="text-xs mt-1">Messages from demo will appear here</p>
               </div>
             ) : (
-              messages.map((message) => (
-                <div key={message.id} className="flex flex-col">
-                  <div 
-                    className={`max-w-[75%] px-3 py-2 ${
-                      message.sender === 'user' ? 'self-end' : 'self-start'
-                    }`}
-                    style={{
-                      backgroundColor: message.sender === 'user' ? '#007AFF' : currentTheme.bubbleColor,
-                      color: message.sender === 'user' ? '#FFFFFF' : currentTheme.textColor,
-                      borderRadius: currentTheme.borderRadius,
-                      fontFamily: currentTheme.fontFamily
-                    }}
-                  >
-                    <p className="text-xs leading-tight break-words">{message.content}</p>
-                  </div>
-                  {currentTheme.showTimestamp && (
-                    <div className={`text-xs text-gray-500 mt-1 ${
-                      message.sender === 'user' ? 'self-end' : 'self-start'
-                    }`}>
-                      {message.timestamp.toLocaleTimeString('en-US', { 
-                        hour: 'numeric', 
-                        minute: '2-digit' 
-                      })}
-                      {currentTheme.showDeliveryStatus && message.sender === 'user' && (
-                        <span className="ml-1">
-                          {message.delivered ? (message.read ? '✓✓' : '✓') : '⏱'}
-                        </span>
+              messages.map((message) => {
+                const isUser = message.sender === 'user';
+                const isRichMessage = message.channel === 'rcs' && message.type !== 'text';
+                
+                return (
+                  <div key={message.id} className="flex flex-col">
+                    <div 
+                      className={`max-w-[85%] ${
+                        isUser ? 'self-end' : 'self-start'
+                      } ${isRichMessage ? 'min-w-0' : 'px-3 py-2'}`}
+                      style={!isRichMessage ? {
+                        backgroundColor: isUser ? '#007AFF' : currentTheme.bubbleColor,
+                        color: isUser ? '#FFFFFF' : currentTheme.textColor,
+                        borderRadius: currentTheme.borderRadius,
+                        fontFamily: currentTheme.fontFamily
+                      } : {}}
+                    >
+                      {/* Regular text message */}
+                      {(!isRichMessage || message.type === 'text') && (
+                        <p className="text-xs leading-tight break-words">{message.content}</p>
+                      )}
+                      
+                      {/* Quick Replies (RCS only) */}
+                      {message.type === 'quick_replies' && message.quickReplies && (
+                        <div className="bg-white rounded-lg p-2 shadow-sm border">
+                          <p className="text-xs text-gray-900 mb-2 break-words">{message.content}</p>
+                          <div className="flex flex-wrap gap-1">
+                            {message.quickReplies.map((reply) => (
+                              <button
+                                key={reply.id}
+                                className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs hover:bg-blue-200"
+                              >
+                                {reply.title}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Card (RCS only) */}
+                      {message.type === 'card' && message.card && (
+                        <div className="bg-white rounded-lg p-3 shadow-sm border">
+                          <p className="text-xs text-gray-900 mb-2 break-words">{message.content}</p>
+                          <div className="bg-gray-50 rounded-lg p-3 border">
+                            <div className="text-3xl text-center mb-2">{message.card.image}</div>
+                            <h5 className="font-semibold text-sm mb-1">{message.card.title}</h5>
+                            <p className="text-xs text-gray-600 mb-3">{message.card.subtitle}</p>
+                            <div className="flex space-x-1">
+                              {message.card.buttons.map((button, idx) => (
+                                <button
+                                  key={idx}
+                                  className="flex-1 bg-blue-500 text-white text-xs py-2 rounded hover:bg-blue-600"
+                                >
+                                  {button.title}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Carousel (RCS only) */}
+                      {message.type === 'carousel' && message.carousel && (
+                        <div className="bg-white rounded-lg p-2 shadow-sm border">
+                          <p className="text-xs text-gray-900 mb-2 break-words">{message.content}</p>
+                          <div className="flex space-x-1 overflow-x-auto pb-2 max-w-full">
+                            {message.carousel.map((item) => (
+                              <div key={item.id} className="min-w-[100px] flex-shrink-0 bg-gray-50 rounded-lg p-2 border">
+                                <div className="text-lg text-center mb-1">{item.image}</div>
+                                <h5 className="font-semibold text-xs mb-1 truncate">{item.title}</h5>
+                                <p className="text-xs text-gray-600 mb-1 truncate">{item.subtitle}</p>
+                                <p className="font-bold text-xs text-green-600 mb-2">{item.price}</p>
+                                {item.buttons.map((button, idx) => (
+                                  <button
+                                    key={idx}
+                                    className="w-full bg-green-500 text-white text-xs py-1 rounded hover:bg-green-600"
+                                  >
+                                    {button.title}
+                                  </button>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-              ))
+                    
+                    {/* Channel indicator for RCS messages */}
+                    {message.channel === 'rcs' && (
+                      <div className={`text-xs text-gray-400 mt-1 ${
+                        isUser ? 'self-end' : 'self-start'
+                      }`}>
+                        💬 RCS
+                      </div>
+                    )}
+                    
+                    {currentTheme.showTimestamp && (
+                      <div className={`text-xs text-gray-500 mt-1 ${
+                        isUser ? 'self-end' : 'self-start'
+                      }`}>
+                        {message.timestamp.toLocaleTimeString('en-US', { 
+                          hour: 'numeric', 
+                          minute: '2-digit' 
+                        })}
+                        {currentTheme.showDeliveryStatus && isUser && (
+                          <span className="ml-1">
+                            {message.delivered ? (message.read ? '✓✓' : '✓') : '⏱'}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
@@ -355,139 +558,19 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
 
   const renderWhatsAppApp = () => {
 
-    // Sample WhatsApp messages with rich content
-    const whatsAppMessages = [
-      {
-        id: '1',
-        type: 'text',
-        content: 'Welcome to Owl Shop! 🦉 How can we help you today?',
-        sender: 'business',
-        timestamp: new Date(Date.now() - 300000),
-        delivered: true,
-        read: true
-      },
-      {
-        id: '2',
-        type: 'quick_replies',
-        content: 'What would you like to do?',
-        sender: 'business',
-        timestamp: new Date(Date.now() - 240000),
-        delivered: true,
-        read: true,
-        quickReplies: [
-          { id: '1', title: '🛍️ Shop Now' },
-          { id: '2', title: '📦 Track Order' },
-          { id: '3', title: '💬 Support' }
-        ]
-      },
-      {
-        id: '3',
-        type: 'text',
-        content: 'Shop Now',
-        sender: 'user',
-        timestamp: new Date(Date.now() - 180000),
-        delivered: true,
-        read: true
-      },
-      {
-        id: '4',
-        type: 'carousel',
-        content: 'Here are our featured products:',
-        sender: 'business',
-        timestamp: new Date(Date.now() - 120000),
-        delivered: true,
-        read: true,
-        carousel: [
-          {
-            id: '1',
-            image: '🦉',
-            title: 'Owl Hoodie',
-            subtitle: 'Comfortable premium hoodie',
-            price: '$49.99',
-            buttons: [{ title: 'Buy Now', type: 'url' }]
-          },
-          {
-            id: '2', 
-            image: '👔',
-            title: 'Dev T-Shirt',
-            subtitle: 'Perfect for coding sessions',
-            price: '$29.99',
-            buttons: [{ title: 'Buy Now', type: 'url' }]
-          },
-          {
-            id: '3',
-            image: '☕',
-            title: 'Code & Coffee Mug',
-            subtitle: 'Fuel your programming',
-            price: '$19.99',
-            buttons: [{ title: 'Buy Now', type: 'url' }]
-          }
-        ]
-      },
-      {
-        id: '5',
-        type: 'card',
-        content: 'Special offer just for you!',
-        sender: 'business',
-        timestamp: new Date(Date.now() - 60000),
-        delivered: true,
-        read: false,
-        card: {
-          image: '🎉',
-          title: '25% OFF Everything',
-          subtitle: 'Limited time offer - Use code: TWILIO25',
-          buttons: [
-            { title: 'Shop Now', type: 'url' },
-            { title: 'Copy Code', type: 'action' }
-          ]
-        }
-      },
-      {
-        id: '6',
-        type: 'text',
-        content: 'Thank you for choosing Owl Shop! 🙏',
-        sender: 'business',
-        timestamp: new Date(Date.now() - 30000),
-        delivered: true,
-        read: false
-      },
-      {
-        id: '7',
-        type: 'text',
-        content: 'Looking forward to serving you again!',
-        sender: 'business',
-        timestamp: new Date(Date.now() - 15000),
-        delivered: true,
-        read: false
-      },
-      {
-        id: '8',
-        type: 'text',
-        content: 'Have a great day! 🌟',
-        sender: 'business',
-        timestamp: new Date(Date.now() - 5000),
-        delivered: true,
-        read: false
-      }
-    ];
+    // WhatsApp messages now come from dynamic whatsAppMessages state
 
+    // Get the latest WhatsApp message for the chat preview
+    const latestMessage = whatsAppMessages.length > 0 ? whatsAppMessages[whatsAppMessages.length - 1] : null;
+    
     const chats = [
       {
         id: 'business',
-        name: 'Owl Shop',
+        name: config.virtualPhone.contactName,
         avatar: '🏪',
-        lastMessage: 'Special offer just for you!',
-        timestamp: new Date(Date.now() - 60000),
-        unread: 1,
-        online: true
-      },
-      {
-        id: 'support',
-        name: 'Owl Support',
-        avatar: '🦉',
-        lastMessage: 'How can we help you?',
-        timestamp: new Date(Date.now() - 3600000),
-        unread: 0,
+        lastMessage: latestMessage ? latestMessage.content : 'No messages yet',
+        timestamp: latestMessage ? latestMessage.timestamp : new Date(),
+        unread: whatsAppMessages.filter(msg => !msg.read && msg.sender === 'contact').length,
         online: true
       }
     ];
@@ -743,14 +826,18 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
           <div>
             <h3 className="text-xs font-medium text-gray-900 mb-1">{config.uiText.virtualPhone.recentActivity}</h3>
             <div className="space-y-1">
-              {whatsAppMessages.slice(-1).map((message, index) => (
-                <div key={index} className="bg-gray-50 p-1 rounded">
-                  <p className="text-xs text-gray-600 truncate break-words">{message.content}</p>
-                  <p className="text-xs text-gray-400 truncate">
-                    {message.timestamp.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </p>
-                </div>
-              ))}
+              {whatsAppMessages.length === 0 ? (
+                <p className="text-xs text-gray-500">No recent messages</p>
+              ) : (
+                whatsAppMessages.slice(-1).map((message, index) => (
+                  <div key={index} className="bg-gray-50 p-1 rounded">
+                    <p className="text-xs text-gray-600 truncate break-words">{message.content}</p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {message.timestamp.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -761,7 +848,14 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
       <div className="flex-1 flex flex-col bg-green-50 min-h-0">
         {/* Messages */}
         <div className="flex-1 p-3 overflow-y-auto overflow-x-hidden bg-gradient-to-b from-green-50 to-green-100 min-h-0">
-          {whatsAppMessages.map(renderMessage)}
+          {whatsAppMessages.length === 0 ? (
+            <div className="text-center text-gray-500 text-xs h-full flex flex-col justify-center">
+              <p>No messages yet</p>
+              <p className="text-xs mt-1">WhatsApp messages from demo will appear here</p>
+            </div>
+          ) : (
+            whatsAppMessages.map(renderMessage)
+          )}
         </div>
         
         {/* Input Bar */}

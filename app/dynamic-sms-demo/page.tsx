@@ -9,7 +9,8 @@ import ConfigPanel from "@/components/ConfigPanel";
 // Extend Window interface to include our custom property
 declare global {
   interface Window {
-    virtualPhoneReceiveMessage?: (content: string, messageId?: string) => void;
+    virtualPhoneReceiveMessage?: (content: string, messageId?: string, channel?: 'sms' | 'rcs' | 'whatsapp', template?: MessageTemplate) => void;
+    virtualPhoneSwitchApp?: (channel: 'sms' | 'rcs' | 'whatsapp') => void;
   }
 }
 
@@ -31,6 +32,8 @@ export default function DynamicSMSDemo() {
     });
     const [configPanelOpen, setConfigPanelOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<string>('all');
+    const [selectedChannel, setSelectedChannel] = useState<'sms' | 'rcs' | 'whatsapp'>('sms');
+    const [selectedContentType, setSelectedContentType] = useState<'text' | 'media' | 'card' | 'quickReplies' | 'carousel'>('text');
 
     // Fetch Twilio status on component mount
     useEffect(() => {
@@ -70,6 +73,42 @@ export default function DynamicSMSDemo() {
         setResults([]);
     };
 
+    // Function to switch virtual phone app based on channel
+    const switchVirtualPhoneApp = (channel: 'sms' | 'rcs' | 'whatsapp') => {
+        if (window.virtualPhoneSwitchApp) {
+            window.virtualPhoneSwitchApp(channel);
+        }
+    };
+
+    // Handle channel selection with app switching
+    const handleChannelChange = (channel: 'sms' | 'rcs' | 'whatsapp') => {
+        setSelectedChannel(channel);
+        
+        // Reset content type to the first available option for this channel
+        const availableTypes = Object.values(config.richMessageTypes).filter(type => 
+            type.available.includes(channel)
+        );
+        if (availableTypes.length > 0) {
+            setSelectedContentType(availableTypes[0].id as 'text' | 'media' | 'card' | 'quickReplies' | 'carousel');
+        }
+        
+        switchVirtualPhoneApp(channel);
+        addResult(`📱 Switched to ${channel.toUpperCase()} app`);
+    };
+
+    // Check if phone number is required for the current channel
+    const isPhoneNumberRequired = () => {
+        return selectedChannel === 'sms'; // Only SMS requires phone number
+    };
+
+    // Get available content types for the selected channel
+    const getAvailableContentTypes = () => {
+        const types = config.richMessageTypes;
+        return Object.values(types).filter(type => 
+            type.available.includes(selectedChannel)
+        );
+    };
+
     // Helper function to call SMS API
     const callSMSAPI = async (
         action: string,
@@ -105,28 +144,48 @@ export default function DynamicSMSDemo() {
             timestamp: Date.now()
         });
 
-        // Send to Twilio (real SMS)
-        const result = await callSMSAPI(template.apiAction, template.variables);
+        // Send to Twilio (real SMS) - only for SMS channel and only if phone number is provided
+        let result = { success: true, demo: true, sid: 'MOCK' };
+        if (selectedChannel === 'sms' && phoneNumber) {
+            result = await callSMSAPI(template.apiAction, template.variables);
+            addResult(
+                result.success
+                    ? `✅ ${template.title} sent successfully`
+                    : `❌ Failed: ${result.error}`
+            );
+        } else if (selectedChannel === 'sms' && !phoneNumber) {
+            // SMS without phone number - show it's demo mode only
+            addResult(`✅ ${template.title} sent successfully (SMS demo mode - no phone number)`);
+        } else {
+            addResult(`✅ ${template.title} sent successfully (${selectedChannel.toUpperCase()} mock)`);
+        }
 
-        addResult(
-            result.success
-                ? `✅ ${template.title} sent successfully`
-                : `❌ Failed: ${result.error}`
-        );
-
-        // Send to virtual phone (mock message)
+        // Always send to virtual phone (mock message) regardless of real SMS result
         if (window.virtualPhoneReceiveMessage) {
             setTimeout(() => {
-                window.virtualPhoneReceiveMessage!(processedMessage, template.id);
-                addResult(`📱 Message delivered to virtual phone`);
+                // Create template with selected content type for rich channels
+                const enhancedTemplate = {
+                    ...template,
+                    selectedContentType,
+                    richMessageConfig: config.richMessageTypes[selectedContentType]
+                };
+                window.virtualPhoneReceiveMessage!(processedMessage, template.id, selectedChannel, enhancedTemplate);
+                addResult(`📱 Message delivered to virtual phone (${selectedChannel.toUpperCase()} - ${config.richMessageTypes[selectedContentType]?.name || 'Text'})`);
             }, 1000);
         }
 
         // Log detailed response
-        if (result.success) {
-            addResult(`📋 Message Content: "${processedMessage}"`);
-            addResult(`📋 SID: ${result.sid || "N/A"}`);
-            addResult(`📋 Demo Mode: ${result.demo ? "Yes" : "No"}`);
+        addResult(`📋 Message Content: "${processedMessage}"`);
+        if (selectedChannel === 'sms') {
+            if (phoneNumber) {
+                addResult(`📋 SID: ${result.sid || "N/A"}`);
+                addResult(`📋 Demo Mode: ${result.demo ? "Yes" : "No"}`);
+            } else {
+                addResult(`📋 Demo Mode: Yes (No phone number provided)`);
+            }
+        } else {
+            addResult(`📋 Channel: ${selectedChannel.toUpperCase()}`);
+            addResult(`📋 Mock Mode: Yes`);
         }
 
         setIsRunning(false);
@@ -274,7 +333,76 @@ export default function DynamicSMSDemo() {
                                     '--tw-ring-color': config.brandColors.primary
                                 } as React.CSSProperties}
                             />
+                            <p className="twilio-text text-xs mt-2" style={{ color: config.brandColors.text }}>
+                                {selectedChannel === 'sms' 
+                                    ? '📱 Optional for SMS (required for real Twilio messages, demo works without)'
+                                    : '📱 Optional for RCS/WhatsApp (mock messages only)'
+                                }
+                            </p>
                         </div>
+
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            <h2 className="buffalo-title text-xl mb-4" style={{ color: config.brandColors.secondary }}>
+                                MESSAGING CHANNEL
+                            </h2>
+                            <div className="space-y-3">
+                                {(['sms', 'rcs', 'whatsapp'] as const).map((channel) => (
+                                    <button
+                                        key={channel}
+                                        onClick={() => handleChannelChange(channel)}
+                                        className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 border-2 ${
+                                            selectedChannel === channel
+                                                ? 'text-white'
+                                                : 'hover:border-opacity-60'
+                                        }`}
+                                        style={{
+                                            backgroundColor: selectedChannel === channel ? config.brandColors.primary : 'transparent',
+                                            borderColor: config.brandColors.primary,
+                                            color: selectedChannel === channel ? 'white' : config.brandColors.primary
+                                        }}
+                                    >
+                                        {channel === 'sms' && '📱 SMS'}
+                                        {channel === 'rcs' && '💬 RCS'}
+                                        {channel === 'whatsapp' && '🟢 WhatsApp'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Content Type Selector - Only show for RCS/WhatsApp */}
+                        {(selectedChannel === 'rcs' || selectedChannel === 'whatsapp') && (
+                            <div className="bg-white rounded-lg shadow-lg p-6">
+                                <h2 className="buffalo-title text-xl mb-4" style={{ color: config.brandColors.secondary }}>
+                                    MESSAGE CONTENT TYPE
+                                </h2>
+                                <div className="space-y-2">
+                                    {getAvailableContentTypes().map((contentType) => (
+                                        <button
+                                            key={contentType.id}
+                                            onClick={() => setSelectedContentType(contentType.id as 'text' | 'media' | 'card' | 'quickReplies' | 'carousel')}
+                                            className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 border text-left ${
+                                                selectedContentType === contentType.id
+                                                    ? 'text-white border-transparent'
+                                                    : 'hover:border-opacity-60'
+                                            }`}
+                                            style={{
+                                                backgroundColor: selectedContentType === contentType.id ? config.brandColors.accent : 'transparent',
+                                                borderColor: selectedContentType === contentType.id ? 'transparent' : config.brandColors.accent + '40',
+                                                color: selectedContentType === contentType.id ? 'white' : config.brandColors.accent
+                                            }}
+                                        >
+                                            <div className="flex items-center space-x-3">
+                                                <span className="text-xl">{contentType.icon}</span>
+                                                <div>
+                                                    <div className="font-semibold">{contentType.name}</div>
+                                                    <div className="text-sm opacity-75">{contentType.description}</div>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="bg-white rounded-lg shadow-lg p-6">
                             <h2 className="buffalo-title text-xl mb-4" style={{ color: config.brandColors.secondary }}>
@@ -283,7 +411,7 @@ export default function DynamicSMSDemo() {
                             <div className="space-y-3">
                                 <button
                                     onClick={sendJourneyFlow}
-                                    disabled={!phoneNumber || isRunning}
+                                    disabled={isRunning}
                                     className="w-full py-3 rounded-lg font-semibold disabled:opacity-50 text-white transition-all duration-200"
                                     style={{ backgroundColor: config.brandColors.primary }}
                                 >
@@ -343,8 +471,9 @@ export default function DynamicSMSDemo() {
                                         onSend={sendMessage}
                                         onUpdate={updateTemplate}
                                         isLoading={isRunning}
-                                        disabled={!phoneNumber}
+                                        disabled={false}
                                         brandColors={config.brandColors}
+                                        selectedChannel={selectedChannel}
                                         uiText={{
                                             buttons: config.uiText.buttons,
                                             forms: config.uiText.forms

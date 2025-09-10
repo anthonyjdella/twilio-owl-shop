@@ -178,6 +178,60 @@ export interface DemoConfig {
     messageIds: string[];
   }[];
   
+  // Rich Message Content Types Configuration
+  richMessageTypes: {
+    text: {
+      id: string;
+      name: string;
+      description: string;
+      icon: string;
+      available: ('sms' | 'rcs' | 'whatsapp')[];
+    };
+    media: {
+      id: string;
+      name: string;
+      description: string;
+      icon: string;
+      available: ('sms' | 'rcs' | 'whatsapp')[];
+      mediaUrl?: string;
+      mediaType?: 'image' | 'video' | 'audio' | 'document';
+    };
+    card: {
+      id: string;
+      name: string;
+      description: string;
+      icon: string;
+      available: ('sms' | 'rcs' | 'whatsapp')[];
+      cardTitle?: string;
+      cardSubtitle?: string;
+      cardImage?: string;
+      buttons?: Array<{ title: string; type: 'url' | 'action' }>;
+    };
+    quickReplies: {
+      id: string;
+      name: string;
+      description: string;
+      icon: string;
+      available: ('sms' | 'rcs' | 'whatsapp')[];
+      replies?: Array<{ id: string; title: string }>;
+    };
+    carousel: {
+      id: string;
+      name: string;
+      description: string;
+      icon: string;
+      available: ('sms' | 'rcs' | 'whatsapp')[];
+      items?: Array<{
+        id: string;
+        image: string;
+        title: string;
+        subtitle: string;
+        price?: string;
+        buttons: Array<{ title: string; type: 'url' | 'action' }>;
+      }>;
+    };
+  };
+  
   // API Configuration
   apiConfig: {
     enableRiskCheck: boolean;
@@ -495,6 +549,84 @@ export const defaultDemoConfig: DemoConfig = {
       messageIds: ["otp"]
     }
   ],
+  
+  richMessageTypes: {
+    text: {
+      id: "text",
+      name: "Text Message",
+      description: "Simple text-only message",
+      icon: "💬",
+      available: ["sms", "rcs", "whatsapp"]
+    },
+    media: {
+      id: "media",
+      name: "Media Message",
+      description: "Message with image, video, or document",
+      icon: "📷",
+      available: ["rcs", "whatsapp"],
+      mediaUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400",
+      mediaType: "image"
+    },
+    card: {
+      id: "card",
+      name: "Card Message",
+      description: "Rich card with image, title, and buttons",
+      icon: "🃏",
+      available: ["rcs", "whatsapp"],
+      cardTitle: "Special Offer!",
+      cardSubtitle: "Limited time deal - Don't miss out!",
+      cardImage: "🎉",
+      buttons: [
+        { title: "Shop Now", type: "url" },
+        { title: "Learn More", type: "action" }
+      ]
+    },
+    quickReplies: {
+      id: "quickReplies",
+      name: "Quick Replies",
+      description: "Message with suggested reply buttons",
+      icon: "⚡",
+      available: ["rcs", "whatsapp"],
+      replies: [
+        { id: "1", title: "🛍️ Shop Now" },
+        { id: "2", title: "📞 Call Us" },
+        { id: "3", title: "💬 Chat" }
+      ]
+    },
+    carousel: {
+      id: "carousel",
+      name: "Product Carousel",
+      description: "Multiple cards with products or options",
+      icon: "🎠",
+      available: ["rcs", "whatsapp"],
+      items: [
+        {
+          id: "1",
+          image: "🦉",
+          title: "Owl Hoodie",
+          subtitle: "Premium comfort hoodie",
+          price: "$49.99",
+          buttons: [{ title: "Buy Now", type: "url" }]
+        },
+        {
+          id: "2",
+          image: "👔",
+          title: "Dev T-Shirt",
+          subtitle: "Perfect for coding",
+          price: "$29.99",
+          buttons: [{ title: "Buy Now", type: "url" }]
+        },
+        {
+          id: "3",
+          image: "☕",
+          title: "Code Mug",
+          subtitle: "Fuel your coding",
+          price: "$19.99",
+          buttons: [{ title: "Buy Now", type: "url" }]
+        }
+      ]
+    }
+  },
   
   apiConfig: {
     enableRiskCheck: true,

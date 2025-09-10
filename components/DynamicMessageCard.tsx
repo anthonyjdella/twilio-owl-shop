@@ -9,6 +9,7 @@ interface DynamicMessageCardProps {
   onUpdate?: (template: MessageTemplate) => void;
   isLoading: boolean;
   disabled: boolean;
+  selectedChannel?: 'sms' | 'rcs' | 'whatsapp';
   brandColors: {
     primary: string;
     secondary: string;
@@ -42,6 +43,7 @@ export default function DynamicMessageCard({
   onUpdate,
   isLoading, 
   disabled,
+  selectedChannel = 'sms',
   brandColors,
   uiText
 }: DynamicMessageCardProps) {
@@ -77,6 +79,15 @@ export default function DynamicMessageCard({
     setProcessedMessage(processMessageTemplate(template));
     setEditingTemplate(template);
   }, [template]);
+
+  // Update processed message when editing template changes
+  useEffect(() => {
+    if (isEditing) {
+      setProcessedMessage(processMessageTemplate(editingTemplate));
+    } else {
+      setProcessedMessage(processMessageTemplate(template));
+    }
+  }, [editingTemplate, template, isEditing]);
 
   const handleSaveEdit = () => {
     if (onUpdate) {
@@ -161,37 +172,29 @@ export default function DynamicMessageCard({
   return (
     <div className="bg-white rounded-lg shadow-lg p-3 border-l-4 flex flex-col overflow-hidden w-full" style={{ borderLeftColor: categoryColor }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
-        <div className="flex items-center space-x-2 min-w-0 flex-1">
-          <div 
-            className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0"
-            style={{ backgroundColor: categoryColor, color: 'white' }}
-          >
-            {template.emoji}
+      <div className="mb-4 flex-shrink-0">
+        {/* Top row: Title, Description and Edit Button */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            <div 
+              className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
+              style={{ backgroundColor: categoryColor, color: 'white' }}
+            >
+              {template.emoji}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-base mb-1 break-words" style={{ color: brandColors.secondary }}>
+                {template.title}
+              </h3>
+              <p className="text-sm break-words leading-relaxed" style={{ color: brandColors.text }}>
+                {template.description}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-sm break-words" style={{ color: brandColors.secondary }}>
-              {template.title}
-            </h3>
-            <p className="text-xs break-words leading-tight" style={{ color: brandColors.text }}>
-              {template.description}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center space-x-1 flex-shrink-0">
-          <span 
-            className="px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap"
-            style={{ 
-              backgroundColor: categoryColor + '20', 
-              color: categoryColor 
-            }}
-          >
-            {template.category}
-          </span>
           {onUpdate && (
             <button
               onClick={() => setIsEditing(!isEditing)}
-              className={`p-2 text-sm rounded-full flex-shrink-0 transition-all duration-200 ${
+              className={`p-2 text-sm rounded-full flex-shrink-0 transition-all duration-200 ml-2 ${
                 isEditing 
                   ? 'bg-red-100 hover:bg-red-200 text-red-600 border border-red-300' 
                   : 'bg-blue-100 hover:bg-blue-200 text-blue-600 border border-blue-300 hover:shadow-md'
@@ -201,6 +204,31 @@ export default function DynamicMessageCard({
               {isEditing ? "✕" : "✏️"}
             </button>
           )}
+        </div>
+        
+        {/* Bottom row: Category and Channel tags */}
+        <div className="flex items-center space-x-2 ml-13">
+          <span 
+            className="px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap"
+            style={{ 
+              backgroundColor: categoryColor + '20', 
+              color: categoryColor 
+            }}
+          >
+            {template.category}
+          </span>
+          <span 
+            className="px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap border"
+            style={{ 
+              backgroundColor: 'white', 
+              color: brandColors.primary,
+              borderColor: brandColors.primary + '40'
+            }}
+          >
+            {selectedChannel === 'sms' && '📱 SMS'}
+            {selectedChannel === 'rcs' && '💬 RCS'}
+            {selectedChannel === 'whatsapp' && '🟢 WhatsApp'}
+          </span>
         </div>
       </div>
 
