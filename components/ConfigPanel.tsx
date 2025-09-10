@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DemoConfig, MessageTheme, PhoneAppConfig } from "@/config/demo-config";
+import { DemoConfig } from "@/config/demo-config";
 
 interface ConfigPanelProps {
   config: DemoConfig;
@@ -64,7 +64,7 @@ export default function ConfigPanel({ config, onConfigChange, isOpen, onToggle }
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as 'general' | 'phone' | 'themes' | 'messages')}
               className={`flex-1 px-3 py-2 text-sm font-medium text-center border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
@@ -132,13 +132,13 @@ export default function ConfigPanel({ config, onConfigChange, isOpen, onToggle }
                       <input
                         type="color"
                         value={value}
-                        onChange={(e) => updateBrandColors({ [key]: e.target.value } as any)}
+                        onChange={(e) => updateBrandColors({ [key]: e.target.value } as Partial<DemoConfig['brandColors']>)}
                         className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
                       />
                       <input
                         type="text"
                         value={value}
-                        onChange={(e) => updateBrandColors({ [key]: e.target.value } as any)}
+                        onChange={(e) => updateBrandColors({ [key]: e.target.value } as Partial<DemoConfig['brandColors']>)}
                         className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded font-mono"
                       />
                     </div>

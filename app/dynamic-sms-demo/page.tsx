@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { defaultDemoConfig, DemoConfig, MessageTemplate, processMessageTemplate, loadDemoConfig } from "@/config/demo-config";
+import { useState, useEffect } from "react";
+import { defaultDemoConfig, DemoConfig, MessageTemplate, processMessageTemplate } from "@/config/demo-config";
 import VirtualPhone from "@/components/VirtualPhone";
 import DynamicMessageCard from "@/components/DynamicMessageCard";
 import ConfigPanel from "@/components/ConfigPanel";
+
+// Extend Window interface to include our custom property
+declare global {
+  interface Window {
+    virtualPhoneReceiveMessage?: (content: string, messageId?: string) => void;
+  }
+}
 
 interface TwilioStatus {
     configured: boolean;
@@ -24,8 +31,6 @@ export default function DynamicSMSDemo() {
     });
     const [configPanelOpen, setConfigPanelOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<string>('all');
-    
-    const virtualPhoneRef = useRef<any>(null);
 
     // Fetch Twilio status on component mount
     useEffect(() => {
@@ -112,7 +117,7 @@ export default function DynamicSMSDemo() {
         // Send to virtual phone (mock message)
         if (window.virtualPhoneReceiveMessage) {
             setTimeout(() => {
-                window.virtualPhoneReceiveMessage(processedMessage, template.id);
+                window.virtualPhoneReceiveMessage!(processedMessage, template.id);
                 addResult(`📱 Message delivered to virtual phone`);
             }, 1000);
         }
@@ -256,7 +261,7 @@ export default function DynamicSMSDemo() {
                                 style={{ 
                                     borderColor: config.brandColors.text + '50',
                                     '--tw-ring-color': config.brandColors.primary
-                                } as any}
+                                } as React.CSSProperties}
                             />
                         </div>
 
@@ -344,7 +349,6 @@ export default function DynamicSMSDemo() {
                             </h2>
                             <div className="flex justify-center">
                                 <VirtualPhone 
-                                    ref={virtualPhoneRef}
                                     config={config}
                                     onMessageReceived={(message) => {
                                         addResult(`📱 Virtual phone received: "${message.content}"`);

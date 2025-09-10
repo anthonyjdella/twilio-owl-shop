@@ -1,7 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { DemoConfig, MessageTheme, PhoneAppConfig, getMessageTheme, getPhoneApp } from "@/config/demo-config";
+import { useState, useEffect, useCallback } from "react";
+import { DemoConfig, getMessageTheme } from "@/config/demo-config";
+
+// Extend Window interface to include our custom property
+declare global {
+  interface Window {
+    virtualPhoneReceiveMessage?: (content: string, messageId?: string) => void;
+  }
+}
 
 interface Message {
   id: string;
@@ -38,7 +45,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   }, []);
 
   // Function to receive a new message from the demo
-  const receiveMessage = (content: string, messageId?: string) => {
+  const receiveMessage = useCallback((content: string, messageId?: string) => {
     const newMessage: Message = {
       id: messageId || `msg_${Date.now()}`,
       content,
@@ -64,19 +71,18 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     if (!isScreenOn) {
       setIsScreenOn(true);
     }
-  };
+  }, [currentApp, isScreenOn, onMessageReceived]);
 
   // Expose receiveMessage function globally for the demo to use
   useEffect(() => {
-    (window as any).virtualPhoneReceiveMessage = receiveMessage;
+    window.virtualPhoneReceiveMessage = receiveMessage;
     
     return () => {
-      delete (window as any).virtualPhoneReceiveMessage;
+      delete window.virtualPhoneReceiveMessage;
     };
-  }, []);
+  }, [receiveMessage]);
 
   const currentTheme = getMessageTheme(config, config.virtualPhone.messageTheme);
-  const currentAppConfig = getPhoneApp(config, currentApp);
 
   const renderStatusBar = () => (
     <div className="flex justify-between items-center px-6 py-2 text-white text-sm font-medium">
