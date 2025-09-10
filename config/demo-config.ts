@@ -8,10 +8,9 @@ export interface MessageTemplate {
   emoji: string;
   category: 'transactional' | 'marketing' | 'notification' | 'authentication';
   messageContent: string;
-  variables?: Record<string, any>;
+  variables?: Record<string, string | number>;
   apiAction: string;
   buttonText: string;
-  color: string;
 }
 
 export interface PhoneAppConfig {
@@ -268,8 +267,7 @@ export const defaultDemoConfig: DemoConfig = {
       messageContent: "Welcome to {{brandName}}, {{customerName}}! 🎉 Your account is ready. Reply STOP to opt out.",
       variables: { customerName: "Demo User" },
       apiAction: "welcome",
-      buttonText: "Send Welcome",
-      color: "#00C758"
+      buttonText: "Send Welcome"
     },
     {
       id: "marketing", 
@@ -280,8 +278,7 @@ export const defaultDemoConfig: DemoConfig = {
       messageContent: "🔥 Exclusive Deal! Get 25% OFF premium items at {{brandName}}. Limited time! Shop now: {{shopUrl}} Reply STOP to opt out.",
       variables: { shopUrl: "https://owlshop.com/sale" },
       apiAction: "marketing",
-      buttonText: "Send Marketing",
-      color: "#FF1233"
+      buttonText: "Send Marketing"
     },
     {
       id: "cart-abandonment",
@@ -292,8 +289,7 @@ export const defaultDemoConfig: DemoConfig = {
       messageContent: "Don't forget! You have {{itemCount}} items ({{cartTotal}}) waiting in your {{brandName}} cart. Complete your order: {{cartUrl}}",
       variables: { itemCount: 3, cartTotal: "$247.50", cartUrl: "https://owlshop.com/cart" },
       apiAction: "cart-abandonment",
-      buttonText: "Send Cart Reminder",
-      color: "#F99C00"
+      buttonText: "Send Cart Reminder"
     },
     {
       id: "order-confirmation",
@@ -304,8 +300,7 @@ export const defaultDemoConfig: DemoConfig = {
       messageContent: "Order confirmed! {{brandName}} Order #{{orderNumber}} for {{orderTotal}} is being processed. Track: {{trackUrl}}",
       variables: { orderNumber: "OWL{{timestamp}}", orderTotal: "$247.50", trackUrl: "https://owlshop.com/track" },
       apiAction: "order-confirmation", 
-      buttonText: "Send Confirmation",
-      color: "#3080FF"
+      buttonText: "Send Confirmation"
     },
     {
       id: "shipping-update",
@@ -316,8 +311,7 @@ export const defaultDemoConfig: DemoConfig = {
       messageContent: "📦 Your {{brandName}} order #{{orderNumber}} has shipped! Track: {{trackingNumber}} Delivery expected {{deliveryDate}}",
       variables: { orderNumber: "OWL{{timestamp}}", trackingNumber: "TW{{timestamp}}", deliveryDate: "Tomorrow" },
       apiAction: "shipping-update",
-      buttonText: "Send Shipping",
-      color: "#00A544"
+      buttonText: "Send Shipping"
     },
     {
       id: "survey",
@@ -328,8 +322,7 @@ export const defaultDemoConfig: DemoConfig = {
       messageContent: "How was your {{brandName}} experience? Rate order #{{orderNumber}}: ⭐⭐⭐⭐⭐ Reply 1-5 or visit {{surveyUrl}}",
       variables: { orderNumber: "OWL{{timestamp}}", surveyUrl: "https://owlshop.com/survey" },
       apiAction: "post-purchase-survey",
-      buttonText: "Send Survey", 
-      color: "#8B5CF6"
+      buttonText: "Send Survey"
     },
     {
       id: "otp",
@@ -340,8 +333,7 @@ export const defaultDemoConfig: DemoConfig = {
       messageContent: "Your {{brandName}} verification code is: {{otpCode}}. Valid for 10 minutes. Do not share this code.",
       variables: { otpCode: "{{randomOTP}}" },
       apiAction: "test-otp",
-      buttonText: "Send OTP",
-      color: "#DC2626"
+      buttonText: "Send OTP"
     }
   ],
   
@@ -500,7 +492,7 @@ export function getPhoneApp(config: DemoConfig, id: string): PhoneAppConfig | un
   return config.virtualPhone.apps.find(app => app.id === id);
 }
 
-export function processMessageTemplate(template: MessageTemplate, additionalVars?: Record<string, any>): string {
+export function processMessageTemplate(template: MessageTemplate, additionalVars?: Record<string, string | number>): string {
   let message = template.messageContent;
   const allVars = { ...template.variables, ...additionalVars };
   

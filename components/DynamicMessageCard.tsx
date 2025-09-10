@@ -383,7 +383,7 @@ export default function DynamicMessageCard({
             disabled={disabled || isLoading}
             className="w-full py-2 rounded-lg font-medium text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
             style={{ 
-              backgroundColor: template.color || categoryColor,
+              backgroundColor: categoryColor,
               color: 'white'
             }}
           >
