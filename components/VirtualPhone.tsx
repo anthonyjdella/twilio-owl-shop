@@ -351,33 +351,320 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     </div>
   );
 
-  const renderWhatsAppApp = () => (
-    <div className="flex-1 flex flex-col bg-green-50 overflow-hidden">
-      {/* WhatsApp Header */}
+  const renderWhatsAppApp = () => {
+    const [whatsAppView, setWhatsAppView] = useState<'chats' | 'chat'>('chats');
+    const [selectedChat, setSelectedChat] = useState<string>('business');
+
+    // Sample WhatsApp messages with rich content
+    const whatsAppMessages = [
+      {
+        id: '1',
+        type: 'text',
+        content: 'Welcome to Owl Shop! 🦉 How can we help you today?',
+        sender: 'business',
+        timestamp: new Date(Date.now() - 300000),
+        delivered: true,
+        read: true
+      },
+      {
+        id: '2',
+        type: 'quick_replies',
+        content: 'What would you like to do?',
+        sender: 'business',
+        timestamp: new Date(Date.now() - 240000),
+        delivered: true,
+        read: true,
+        quickReplies: [
+          { id: '1', title: '🛍️ Shop Now' },
+          { id: '2', title: '📦 Track Order' },
+          { id: '3', title: '💬 Support' }
+        ]
+      },
+      {
+        id: '3',
+        type: 'text',
+        content: 'Shop Now',
+        sender: 'user',
+        timestamp: new Date(Date.now() - 180000),
+        delivered: true,
+        read: true
+      },
+      {
+        id: '4',
+        type: 'carousel',
+        content: 'Here are our featured products:',
+        sender: 'business',
+        timestamp: new Date(Date.now() - 120000),
+        delivered: true,
+        read: true,
+        carousel: [
+          {
+            id: '1',
+            image: '🦉',
+            title: 'Owl Hoodie',
+            subtitle: 'Comfortable premium hoodie',
+            price: '$49.99',
+            buttons: [{ title: 'Buy Now', type: 'url' }]
+          },
+          {
+            id: '2', 
+            image: '👔',
+            title: 'Dev T-Shirt',
+            subtitle: 'Perfect for coding sessions',
+            price: '$29.99',
+            buttons: [{ title: 'Buy Now', type: 'url' }]
+          },
+          {
+            id: '3',
+            image: '☕',
+            title: 'Code & Coffee Mug',
+            subtitle: 'Fuel your programming',
+            price: '$19.99',
+            buttons: [{ title: 'Buy Now', type: 'url' }]
+          }
+        ]
+      },
+      {
+        id: '5',
+        type: 'card',
+        content: 'Special offer just for you!',
+        sender: 'business',
+        timestamp: new Date(Date.now() - 60000),
+        delivered: true,
+        read: false,
+        card: {
+          image: '🎉',
+          title: '25% OFF Everything',
+          subtitle: 'Limited time offer - Use code: TWILIO25',
+          buttons: [
+            { title: 'Shop Now', type: 'url' },
+            { title: 'Copy Code', type: 'action' }
+          ]
+        }
+      }
+    ];
+
+    const chats = [
+      {
+        id: 'business',
+        name: 'Owl Shop',
+        avatar: '🏪',
+        lastMessage: 'Special offer just for you!',
+        timestamp: new Date(Date.now() - 60000),
+        unread: 1,
+        online: true
+      },
+      {
+        id: 'support',
+        name: 'Owl Support',
+        avatar: '🦉',
+        lastMessage: 'How can we help you?',
+        timestamp: new Date(Date.now() - 3600000),
+        unread: 0,
+        online: true
+      }
+    ];
+
+    const renderWhatsAppHeader = () => (
       <div className="bg-green-600 text-white p-3 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <button 
-            onClick={() => setCurrentApp(config.virtualPhone.defaultApp)}
-            className="text-white text-sm"
-          >
-            ← Back
-          </button>
-          <h3 className="font-semibold">WhatsApp</h3>
-          <div className="w-8" />
+          {whatsAppView === 'chats' ? (
+            <>
+              <button 
+                onClick={() => setCurrentApp(config.virtualPhone.defaultApp)}
+                className="text-white text-sm"
+              >
+                ← Back
+              </button>
+              <h3 className="font-semibold">WhatsApp</h3>
+              <div className="flex items-center space-x-2">
+                <button className="text-white">🔍</button>
+                <button className="text-white">⋮</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <button 
+                onClick={() => setWhatsAppView('chats')}
+                className="text-white text-sm"
+              >
+                ← Back
+              </button>
+              <div className="flex items-center space-x-2 flex-1 ml-3">
+                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                  🏪
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm">Owl Shop</h3>
+                  <p className="text-xs opacity-75">Online</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button className="text-white">📞</button>
+                <button className="text-white">📹</button>
+                <button className="text-white">⋮</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
+    );
 
-      {/* WhatsApp Interface */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-hidden">
-        <div className="text-4xl mb-4">📱</div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">WhatsApp</h3>
-        <p className="text-center text-gray-500 text-xs px-4">
-          WhatsApp messaging interface<br />
-          Demo mode - shows concept for RCS/WhatsApp Business
-        </p>
+    const renderChatsList = () => (
+      <div className="flex-1 bg-white overflow-y-auto">
+        {chats.map((chat) => (
+          <button
+            key={chat.id}
+            onClick={() => {
+              setSelectedChat(chat.id);
+              setWhatsAppView('chat');
+            }}
+            className="w-full p-3 border-b border-gray-100 hover:bg-gray-50 flex items-center space-x-3"
+          >
+            <div className="relative">
+              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-lg">
+                {chat.avatar}
+              </div>
+              {chat.online && (
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+              )}
+            </div>
+            <div className="flex-1 text-left">
+              <div className="flex justify-between items-start">
+                <h4 className="font-semibold text-sm text-gray-900">{chat.name}</h4>
+                <span className="text-xs text-gray-500">
+                  {chat.timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mt-1">
+                <p className="text-sm text-gray-600 truncate flex-1">{chat.lastMessage}</p>
+                {chat.unread > 0 && (
+                  <div className="bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center ml-2">
+                    {chat.unread}
+                  </div>
+                )}
+              </div>
+            </div>
+          </button>
+        ))}
       </div>
-    </div>
-  );
+    );
+
+    const renderMessage = (message: any) => {
+      const isUser = message.sender === 'user';
+      
+      return (
+        <div key={message.id} className={`flex mb-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
+          <div className={`max-w-[80%] ${isUser ? 'bg-green-500 text-white' : 'bg-white text-gray-900'} rounded-lg p-2 shadow-sm relative`}>
+            {message.type === 'text' && (
+              <p className="text-sm">{message.content}</p>
+            )}
+            
+            {message.type === 'quick_replies' && (
+              <div>
+                <p className="text-sm mb-2">{message.content}</p>
+                <div className="flex flex-wrap gap-1">
+                  {message.quickReplies.map((reply: any) => (
+                    <button
+                      key={reply.id}
+                      className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs hover:bg-green-200"
+                    >
+                      {reply.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {message.type === 'carousel' && (
+              <div>
+                <p className="text-sm mb-2">{message.content}</p>
+                <div className="flex space-x-2 overflow-x-auto pb-2">
+                  {message.carousel.map((item: any) => (
+                    <div key={item.id} className="min-w-[140px] bg-gray-50 rounded-lg p-2 border">
+                      <div className="text-2xl text-center mb-1">{item.image}</div>
+                      <h5 className="font-semibold text-xs mb-1">{item.title}</h5>
+                      <p className="text-xs text-gray-600 mb-1">{item.subtitle}</p>
+                      <p className="font-bold text-sm text-green-600 mb-2">{item.price}</p>
+                      {item.buttons.map((button: any, idx: number) => (
+                        <button
+                          key={idx}
+                          className="w-full bg-green-500 text-white text-xs py-1 rounded hover:bg-green-600"
+                        >
+                          {button.title}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {message.type === 'card' && (
+              <div>
+                <p className="text-sm mb-2">{message.content}</p>
+                <div className="bg-gray-50 rounded-lg p-3 border">
+                  <div className="text-3xl text-center mb-2">{message.card.image}</div>
+                  <h5 className="font-semibold text-sm mb-1">{message.card.title}</h5>
+                  <p className="text-xs text-gray-600 mb-3">{message.card.subtitle}</p>
+                  <div className="flex space-x-1">
+                    {message.card.buttons.map((button: any, idx: number) => (
+                      <button
+                        key={idx}
+                        className="flex-1 bg-green-500 text-white text-xs py-2 rounded hover:bg-green-600"
+                      >
+                        {button.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className={`text-xs mt-1 ${isUser ? 'text-green-100' : 'text-gray-500'} flex items-center justify-end`}>
+              <span>
+                {message.timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              </span>
+              {isUser && (
+                <span className="ml-1">
+                  {message.read ? '✓✓' : message.delivered ? '✓' : '⏱'}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const renderChatView = () => (
+      <div className="flex-1 flex flex-col bg-green-50">
+        {/* Messages */}
+        <div className="flex-1 p-3 overflow-y-auto bg-gradient-to-b from-green-50 to-green-100">
+          {whatsAppMessages.map(renderMessage)}
+        </div>
+        
+        {/* Input Bar */}
+        <div className="bg-white p-2 flex items-center space-x-2 border-t">
+          <button className="text-gray-500">😊</button>
+          <button className="text-gray-500">📎</button>
+          <input
+            type="text"
+            placeholder="Type a message"
+            className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm outline-none"
+            disabled
+          />
+          <button className="text-green-500">🎤</button>
+        </div>
+      </div>
+    );
+
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {renderWhatsAppHeader()}
+        {whatsAppView === 'chats' ? renderChatsList() : renderChatView()}
+      </div>
+    );
+  };
 
   const renderCurrentApp = () => {
     // Show contact profile overlay when requested
