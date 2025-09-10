@@ -167,6 +167,17 @@ export default function DynamicSMSDemo() {
 
     const categories = ['all', ...Array.from(new Set(config.messageTemplates.map(t => t.category)))];
 
+    const getCategoryColor = (category: string) => {
+        switch (category) {
+            case 'marketing': return config.brandColors.primary;
+            case 'transactional': return config.brandColors.accent;
+            case 'notification': return '#00C758';
+            case 'authentication': return '#DC2626';
+            case 'all': return config.brandColors.primary;
+            default: return config.brandColors.primary;
+        }
+    };
+
     return (
         <div className="min-h-screen py-12" style={{ backgroundColor: config.brandColors.background }}>
             <div className="max-w-7xl mx-auto px-4">
@@ -297,25 +308,29 @@ export default function DynamicSMSDemo() {
                         {/* Category Filter */}
                         <div className="bg-white rounded-lg shadow-lg p-4">
                             <div className="flex flex-wrap gap-2">
-                                {categories.map((category) => (
-                                    <button
-                                        key={category}
-                                        onClick={() => setActiveCategory(category)}
-                                        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors capitalize ${
-                                            activeCategory === category
-                                                ? 'text-white'
-                                                : 'text-gray-600 hover:text-gray-800'
-                                        }`}
-                                        style={{
-                                            backgroundColor: activeCategory === category 
-                                                ? config.brandColors.primary 
-                                                : 'transparent',
-                                            border: `1px solid ${config.brandColors.primary}`
-                                        }}
-                                    >
-                                        {category}
-                                    </button>
-                                ))}
+                                {categories.map((category) => {
+                                    const categoryColor = getCategoryColor(category);
+                                    return (
+                                        <button
+                                            key={category}
+                                            onClick={() => setActiveCategory(category)}
+                                            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors capitalize ${
+                                                activeCategory === category
+                                                    ? 'text-white'
+                                                    : 'hover:text-gray-800'
+                                            }`}
+                                            style={{
+                                                backgroundColor: activeCategory === category 
+                                                    ? categoryColor 
+                                                    : 'transparent',
+                                                border: `1px solid ${categoryColor}`,
+                                                color: activeCategory === category ? 'white' : categoryColor
+                                            }}
+                                        >
+                                            {category}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
