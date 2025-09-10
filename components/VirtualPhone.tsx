@@ -30,6 +30,8 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   const [isScreenOn, setIsScreenOn] = useState(true);
   const [currentTime, setCurrentTime] = useState(config.virtualPhone.currentTime);
   const [showContactProfile, setShowContactProfile] = useState(false);
+  const [whatsAppView, setWhatsAppView] = useState<'chats' | 'chat' | 'profile'>('chats');
+  const [selectedChat, setSelectedChat] = useState<string>('business');
 
   // Update time every minute
   useEffect(() => {
@@ -85,7 +87,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   const currentTheme = getMessageTheme(config, config.virtualPhone.messageTheme);
 
   const renderStatusBar = () => (
-    <div className="flex justify-between items-center px-6 py-2 text-white text-sm font-medium">
+    <div className="flex justify-between items-center px-3 py-1 text-white text-xs font-medium">
       <div className="flex items-center space-x-1">
         <span>{currentTime}</span>
       </div>
@@ -95,9 +97,9 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             <div key={i} className="w-1 bg-white rounded-full" style={{ height: `${4 + i * 2}px` }} />
           ))}
         </div>
-        <span className="text-xs ml-2">{config.virtualPhone.carrierName}</span>
-        <div className="flex items-center ml-3">
-          <div className="w-6 h-3 border border-white rounded-sm relative">
+        <span className="text-xs ml-1">{config.virtualPhone.carrierName}</span>
+        <div className="flex items-center ml-2">
+          <div className="w-5 h-2 border border-white rounded-sm relative">
             <div 
               className="h-full bg-white rounded-sm" 
               style={{ width: `${config.virtualPhone.batteryLevel}%` }}
@@ -256,10 +258,10 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
 
         {/* Messages Container */}
         <div 
-          className="flex-1 p-2 overflow-y-auto min-h-0"
+          className="flex-1 p-2 overflow-y-auto overflow-x-hidden min-h-0"
           style={{ backgroundColor: currentTheme.backgroundColor }}
         >
-          <div className="space-y-2 h-full">
+          <div className="space-y-2">
             {messages.length === 0 ? (
               <div className="text-center text-gray-500 text-xs h-full flex flex-col justify-center">
                 <p>No messages yet</p>
@@ -352,8 +354,6 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   );
 
   const renderWhatsAppApp = () => {
-    const [whatsAppView, setWhatsAppView] = useState<'chats' | 'chat'>('chats');
-    const [selectedChat, setSelectedChat] = useState<string>('business');
 
     // Sample WhatsApp messages with rich content
     const whatsAppMessages = [
@@ -441,6 +441,33 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             { title: 'Copy Code', type: 'action' }
           ]
         }
+      },
+      {
+        id: '6',
+        type: 'text',
+        content: 'Thank you for choosing Owl Shop! 🙏',
+        sender: 'business',
+        timestamp: new Date(Date.now() - 30000),
+        delivered: true,
+        read: false
+      },
+      {
+        id: '7',
+        type: 'text',
+        content: 'Looking forward to serving you again!',
+        sender: 'business',
+        timestamp: new Date(Date.now() - 15000),
+        delivered: true,
+        read: false
+      },
+      {
+        id: '8',
+        type: 'text',
+        content: 'Have a great day! 🌟',
+        sender: 'business',
+        timestamp: new Date(Date.now() - 5000),
+        delivered: true,
+        read: false
       }
     ];
 
@@ -474,13 +501,24 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                 onClick={() => setCurrentApp(config.virtualPhone.defaultApp)}
                 className="text-white text-sm"
               >
-                ← Back
+                {config.uiText.virtualPhone.back}
               </button>
-              <h3 className="font-semibold">WhatsApp</h3>
+              <h3 className="font-semibold">{config.uiText.whatsapp.headerTitle}</h3>
               <div className="flex items-center space-x-2">
                 <button className="text-white">🔍</button>
                 <button className="text-white">⋮</button>
               </div>
+            </>
+          ) : whatsAppView === 'profile' ? (
+            <>
+              <button 
+                onClick={() => setWhatsAppView('chat')}
+                className="text-white text-sm"
+              >
+                {config.uiText.virtualPhone.back}
+              </button>
+              <h3 className="font-semibold">{config.uiText.whatsapp.contactInfoTitle}</h3>
+              <div className="w-8" />
             </>
           ) : (
             <>
@@ -488,17 +526,20 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                 onClick={() => setWhatsAppView('chats')}
                 className="text-white text-sm"
               >
-                ← Back
+                {config.uiText.virtualPhone.back}
               </button>
-              <div className="flex items-center space-x-2 flex-1 ml-3">
+              <button
+                className="flex items-center space-x-2 flex-1 ml-3 text-left"
+                onClick={() => setWhatsAppView('profile')}
+              >
                 <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
                   🏪
                 </div>
                 <div>
-                  <h3 className="font-semibold text-sm">Owl Shop</h3>
-                  <p className="text-xs opacity-75">Online</p>
+                  <h3 className="font-semibold text-sm">{config.virtualPhone.contactName}</h3>
+                  <p className="text-xs opacity-75">{config.uiText.whatsapp.online}</p>
                 </div>
-              </div>
+              </button>
               <div className="flex items-center space-x-2">
                 <button className="text-white">📞</button>
                 <button className="text-white">📹</button>
@@ -511,7 +552,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     );
 
     const renderChatsList = () => (
-      <div className="flex-1 bg-white overflow-y-auto">
+      <div className="flex-1 bg-white overflow-y-auto overflow-x-hidden min-h-0">
         {chats.map((chat) => (
           <button
             key={chat.id}
@@ -529,17 +570,17 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                 <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
               )}
             </div>
-            <div className="flex-1 text-left">
+            <div className="flex-1 text-left min-w-0">
               <div className="flex justify-between items-start">
-                <h4 className="font-semibold text-sm text-gray-900">{chat.name}</h4>
-                <span className="text-xs text-gray-500">
+                <h4 className="font-semibold text-sm text-gray-900 truncate flex-1 pr-2">{chat.name}</h4>
+                <span className="text-xs text-gray-500 flex-shrink-0">
                   {chat.timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                 </span>
               </div>
               <div className="flex justify-between items-center mt-1">
-                <p className="text-sm text-gray-600 truncate flex-1">{chat.lastMessage}</p>
+                <p className="text-sm text-gray-600 truncate flex-1 pr-2">{chat.lastMessage}</p>
                 {chat.unread > 0 && (
-                  <div className="bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center ml-2">
+                  <div className="bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
                     {chat.unread}
                   </div>
                 )}
@@ -554,15 +595,15 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
       const isUser = message.sender === 'user';
       
       return (
-        <div key={message.id} className={`flex mb-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
-          <div className={`max-w-[80%] ${isUser ? 'bg-green-500 text-white' : 'bg-white text-gray-900'} rounded-lg p-2 shadow-sm relative`}>
+        <div key={message.id} className={`flex mb-2 ${isUser ? 'justify-end' : 'justify-start'} w-full`}>
+          <div className={`max-w-[85%] min-w-0 ${isUser ? 'bg-green-500 text-white' : 'bg-white text-gray-900'} rounded-lg p-2 shadow-sm relative overflow-hidden`}>
             {message.type === 'text' && (
-              <p className="text-sm">{message.content}</p>
+              <p className="text-sm break-words">{message.content}</p>
             )}
             
             {message.type === 'quick_replies' && (
               <div>
-                <p className="text-sm mb-2">{message.content}</p>
+                <p className="text-sm mb-2 break-words">{message.content}</p>
                 <div className="flex flex-wrap gap-1">
                   {message.quickReplies.map((reply: any) => (
                     <button
@@ -578,14 +619,14 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
 
             {message.type === 'carousel' && (
               <div>
-                <p className="text-sm mb-2">{message.content}</p>
-                <div className="flex space-x-2 overflow-x-auto pb-2">
+                <p className="text-sm mb-2 break-words">{message.content}</p>
+                <div className="flex space-x-1 overflow-x-auto pb-2 max-w-full">
                   {message.carousel.map((item: any) => (
-                    <div key={item.id} className="min-w-[140px] bg-gray-50 rounded-lg p-2 border">
-                      <div className="text-2xl text-center mb-1">{item.image}</div>
-                      <h5 className="font-semibold text-xs mb-1">{item.title}</h5>
-                      <p className="text-xs text-gray-600 mb-1">{item.subtitle}</p>
-                      <p className="font-bold text-sm text-green-600 mb-2">{item.price}</p>
+                    <div key={item.id} className="min-w-[100px] flex-shrink-0 bg-gray-50 rounded-lg p-2 border">
+                      <div className="text-lg text-center mb-1">{item.image}</div>
+                      <h5 className="font-semibold text-xs mb-1 truncate">{item.title}</h5>
+                      <p className="text-xs text-gray-600 mb-1 truncate">{item.subtitle}</p>
+                      <p className="font-bold text-xs text-green-600 mb-2">{item.price}</p>
                       {item.buttons.map((button: any, idx: number) => (
                         <button
                           key={idx}
@@ -602,7 +643,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
 
             {message.type === 'card' && (
               <div>
-                <p className="text-sm mb-2">{message.content}</p>
+                <p className="text-sm mb-2 break-words">{message.content}</p>
                 <div className="bg-gray-50 rounded-lg p-3 border">
                   <div className="text-3xl text-center mb-2">{message.card.image}</div>
                   <h5 className="font-semibold text-sm mb-1">{message.card.title}</h5>
@@ -636,10 +677,90 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
       );
     };
 
+    const renderContactProfile = () => (
+      <div className="flex-1 bg-white overflow-y-auto overflow-x-hidden">
+        {/* Profile Header */}
+        <div className="text-center p-2 bg-gray-50">
+          <div className="w-12 h-12 bg-gray-300 rounded-full mx-auto mb-1 flex items-center justify-center text-lg">
+            🏪
+          </div>
+          <h2 className="text-sm font-semibold text-gray-900 mb-1 truncate px-2">{config.virtualPhone.contactName}</h2>
+          <p className="text-xs text-gray-500 mb-1 truncate px-2">{config.virtualPhone.phoneNumber}</p>
+          <p className="text-xs text-green-600">{config.uiText.whatsapp.online}</p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="p-1 border-b border-gray-200">
+          <div className="flex justify-around">
+            <button className="flex flex-col items-center p-1 hover:bg-gray-50 rounded-lg flex-1 max-w-[70px]">
+              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mb-1">
+                <span className="text-white text-xs">💬</span>
+              </div>
+              <span className="text-xs text-gray-600">{config.uiText.virtualPhone.message}</span>
+            </button>
+            <button className="flex flex-col items-center p-1 hover:bg-gray-50 rounded-lg flex-1 max-w-[70px]">
+              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mb-1">
+                <span className="text-white text-xs">📞</span>
+              </div>
+              <span className="text-xs text-gray-600">{config.uiText.virtualPhone.call}</span>
+            </button>
+            <button className="flex flex-col items-center p-1 hover:bg-gray-50 rounded-lg flex-1 max-w-[70px]">
+              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mb-1">
+                <span className="text-white text-xs">📹</span>
+              </div>
+              <span className="text-xs text-gray-600">{config.uiText.whatsapp.video}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Contact Details */}
+        <div className="p-2">
+          <div className="mb-3">
+            <h3 className="text-xs font-medium text-gray-900 mb-1">{config.uiText.whatsapp.about}</h3>
+            <p className="text-xs text-gray-600 bg-gray-50 p-1 rounded text-xs break-words">
+              {config.uiText.whatsapp.aboutDescription}
+            </p>
+          </div>
+
+          <div className="mb-3">
+            <h3 className="text-xs font-medium text-gray-900 mb-1">{config.uiText.whatsapp.businessInfo}</h3>
+            <div className="space-y-1">
+              <div className="flex items-center">
+                <span className="text-gray-400 mr-1 flex-shrink-0 text-xs">🌐</span>
+                <span className="text-xs text-gray-600 truncate">{config.uiText.whatsapp.website}</span>
+              </div>
+              <div className="flex items-center">
+                <span className="text-gray-400 mr-1 flex-shrink-0 text-xs">📧</span>
+                <span className="text-xs text-gray-600 truncate">{config.uiText.whatsapp.email}</span>
+              </div>
+              <div className="flex items-center">
+                <span className="text-gray-400 mr-1 flex-shrink-0 text-xs">📍</span>
+                <span className="text-xs text-gray-600 truncate">{config.uiText.whatsapp.location}</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-medium text-gray-900 mb-1">{config.uiText.virtualPhone.recentActivity}</h3>
+            <div className="space-y-1">
+              {whatsAppMessages.slice(-1).map((message, index) => (
+                <div key={index} className="bg-gray-50 p-1 rounded">
+                  <p className="text-xs text-gray-600 truncate break-words">{message.content}</p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {message.timestamp.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
     const renderChatView = () => (
-      <div className="flex-1 flex flex-col bg-green-50">
+      <div className="flex-1 flex flex-col bg-green-50 min-h-0">
         {/* Messages */}
-        <div className="flex-1 p-3 overflow-y-auto bg-gradient-to-b from-green-50 to-green-100">
+        <div className="flex-1 p-3 overflow-y-auto overflow-x-hidden bg-gradient-to-b from-green-50 to-green-100 min-h-0">
           {whatsAppMessages.map(renderMessage)}
         </div>
         
@@ -649,7 +770,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
           <button className="text-gray-500">📎</button>
           <input
             type="text"
-            placeholder="Type a message"
+            placeholder={config.uiText.whatsapp.typeMessage}
             className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm outline-none"
             disabled
           />
@@ -659,9 +780,11 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     );
 
     return (
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {renderWhatsAppHeader()}
-        {whatsAppView === 'chats' ? renderChatsList() : renderChatView()}
+        {whatsAppView === 'chats' ? renderChatsList() : 
+         whatsAppView === 'profile' ? renderContactProfile() : 
+         renderChatView()}
       </div>
     );
   };

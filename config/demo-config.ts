@@ -125,6 +125,23 @@ export interface DemoConfig {
       noRecentMessages: string;
       sendTextMessage: string;
     };
+
+    // WhatsApp interface
+    whatsapp: {
+      headerTitle: string;
+      online: string;
+      offline: string;
+      about: string;
+      businessInfo: string;
+      website: string;
+      email: string;
+      location: string;
+      aboutDescription: string;
+      typeMessage: string;
+      chatsTitle: string;
+      contactInfoTitle: string;
+      video: string;
+    };
     
     // Results and logging
     results: {
@@ -239,6 +256,22 @@ export const defaultDemoConfig: DemoConfig = {
       recentActivity: "Recent Activity",
       noRecentMessages: "No recent messages",
       sendTextMessage: "Send a text message"
+    },
+
+    whatsapp: {
+      headerTitle: "WhatsApp",
+      online: "Online",
+      offline: "Offline",
+      about: "About",
+      businessInfo: "Business Info",
+      website: "owlshop.com",
+      email: "support@owlshop.com", 
+      location: "Online Store",
+      aboutDescription: "Welcome to Owl Shop! 🦉 Your destination for developer merchandise.",
+      typeMessage: "Type a message",
+      chatsTitle: "WhatsApp",
+      contactInfoTitle: "Contact Info",
+      video: "Video"
     },
     
     results: {
