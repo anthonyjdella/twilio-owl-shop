@@ -9,8 +9,9 @@ import ConfigPanel from "@/components/ConfigPanel";
 // Extend Window interface to include our custom property
 declare global {
   interface Window {
-    virtualPhoneReceiveMessage?: (content: string, messageId?: string, channel?: 'sms' | 'rcs' | 'whatsapp', template?: MessageTemplate) => void;
-    virtualPhoneSwitchApp?: (channel: 'sms' | 'rcs' | 'whatsapp') => void;
+    virtualPhoneReceiveMessage?: (content: string, messageId?: string, channel?: 'sms' | 'rcs' | 'whatsapp' | 'voice', template?: MessageTemplate) => void;
+    virtualPhoneSwitchApp?: (channel: 'sms' | 'rcs' | 'whatsapp' | 'voice') => void;
+    virtualPhoneInitiateCall?: (number: string, name?: string) => void;
   }
 }
 
@@ -32,7 +33,7 @@ export default function DynamicSMSDemo() {
     });
     const [configPanelOpen, setConfigPanelOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<string>('all');
-    const [selectedChannel, setSelectedChannel] = useState<'sms' | 'rcs' | 'whatsapp'>(config.features.defaultChannel);
+    const [selectedChannel, setSelectedChannel] = useState<'sms' | 'rcs' | 'whatsapp' | 'voice'>(config.features.defaultChannel);
     const [selectedContentType, setSelectedContentType] = useState<'text' | 'media' | 'richCard' | 'carousel' | 'listMessage'>('text');
 
     // Fetch Twilio status on component mount
@@ -74,14 +75,14 @@ export default function DynamicSMSDemo() {
     };
 
     // Function to switch virtual phone app based on channel
-    const switchVirtualPhoneApp = (channel: 'sms' | 'rcs' | 'whatsapp') => {
+    const switchVirtualPhoneApp = (channel: 'sms' | 'rcs' | 'whatsapp' | 'voice') => {
         if (window.virtualPhoneSwitchApp) {
             window.virtualPhoneSwitchApp(channel);
         }
     };
 
     // Handle channel selection with app switching
-    const handleChannelChange = (channel: 'sms' | 'rcs' | 'whatsapp') => {
+    const handleChannelChange = (channel: 'sms' | 'rcs' | 'whatsapp' | 'voice') => {
         setSelectedChannel(channel);
         
         // Reset content type to the first available option for this channel
@@ -141,6 +142,32 @@ export default function DynamicSMSDemo() {
         }
     };
 
+    const callVoiceAPI = async (
+        action: string,
+        message: string,
+        params: Record<string, unknown> = {}
+    ) => {
+        try {
+            const response = await fetch("/api/voice", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    action,
+                    phoneNumber,
+                    message,
+                    ...params,
+                }),
+            });
+
+            return await response.json();
+        } catch (error) {
+            console.error("Voice API call failed:", error);
+            return { success: false, error: "Voice API call failed" };
+        }
+    };
+
     const sendMessage = async (template: MessageTemplate) => {
         setIsRunning(true);
         addResult(`🚀 Sending ${template.title}...`);
@@ -151,9 +178,23 @@ export default function DynamicSMSDemo() {
             timestamp: Date.now()
         });
 
-        // Send to Twilio (real SMS) - only for SMS channel and only if phone number is provided
+        // Handle different channels
         let result = { success: true, demo: true, sid: 'MOCK', error: undefined };
-        if (selectedChannel === 'sms' && phoneNumber) {
+        if (selectedChannel === 'voice') {
+            // Voice channel - make actual voice call and initiate virtual phone call
+            result = await callVoiceAPI(template.apiAction, processedMessage, template.variables);
+            addResult(
+                result.success
+                    ? `✅ ${template.title} - Voice call ${result.demo ? 'simulated' : 'initiated'}`
+                    : `❌ Voice call failed: ${result.error || 'Unknown error'}`
+            );
+            
+            // Also trigger virtual phone call for demo
+            if (window.virtualPhoneInitiateCall) {
+                window.virtualPhoneInitiateCall(phoneNumber || config.features.phoneSettings.defaultPhoneNumber, template.title);
+            }
+        } else if (selectedChannel === 'sms' && phoneNumber) {
+            // Real SMS
             result = await callSMSAPI(template.apiAction, template.variables);
             addResult(
                 result.success
@@ -167,8 +208,8 @@ export default function DynamicSMSDemo() {
             addResult(`✅ ${template.title} sent successfully (${selectedChannel.toUpperCase()} mock)`);
         }
 
-        // Always send to virtual phone (mock message) regardless of real SMS result
-        if (window.virtualPhoneReceiveMessage) {
+        // Send to virtual phone for non-voice channels
+        if (selectedChannel !== 'voice' && window.virtualPhoneReceiveMessage) {
             setTimeout(() => {
                 // Create template with selected content type for rich channels
                 const enhancedTemplate = {
@@ -182,17 +223,32 @@ export default function DynamicSMSDemo() {
         }
 
         // Log detailed response
-        addResult(`📋 Message Content: "${processedMessage}"`);
-        if (selectedChannel === 'sms') {
-            if (phoneNumber) {
-                addResult(`📋 SID: ${result.sid || "N/A"}`);
-                addResult(`📋 Demo Mode: ${result.demo ? "Yes" : "No"}`);
+        if (selectedChannel === 'voice') {
+            addResult(`📋 Call Target: ${phoneNumber || config.features.phoneSettings.defaultPhoneNumber}`);
+            addResult(`📋 Call Script: "${processedMessage}"`);
+            if (phoneNumber && config.features.phoneSettings.enableRealCalls && !result.demo) {
+                addResult(`📋 Call SID: ${result.sid || "N/A"}`);
+                addResult(`📋 Status: ${result.status || "Unknown"}`);
+                addResult(`📋 Real Call: Yes`);
             } else {
-                addResult(`📋 Demo Mode: Yes (No phone number provided)`);
+                const reason = !phoneNumber ? '(No phone number provided)' : 
+                              !config.features.phoneSettings.enableRealCalls ? '(Real calls disabled in config)' : 
+                              '(Twilio not configured)';
+                addResult(`📋 Demo Mode: Yes ${reason}`);
             }
         } else {
-            addResult(`📋 Channel: ${selectedChannel.toUpperCase()}`);
-            addResult(`📋 Mock Mode: Yes`);
+            addResult(`📋 Message Content: "${processedMessage}"`);
+            if (selectedChannel === 'sms') {
+                if (phoneNumber) {
+                    addResult(`📋 SID: ${result.sid || "N/A"}`);
+                    addResult(`📋 Demo Mode: ${result.demo ? "Yes" : "No"}`);
+                } else {
+                    addResult(`📋 Demo Mode: Yes (No phone number provided)`);
+                }
+            } else {
+                addResult(`📋 Channel: ${selectedChannel.toUpperCase()}`);
+                addResult(`📋 Mock Mode: Yes`);
+            }
         }
 
         setIsRunning(false);
@@ -225,10 +281,22 @@ export default function DynamicSMSDemo() {
     };
 
     const getFilteredTemplates = () => {
-        if (activeCategory === 'all') {
-            return config.messageTemplates;
+        let templates = config.messageTemplates;
+        
+        // Filter by channel - show only voice templates for voice channel
+        if (selectedChannel === 'voice') {
+            // Use configurable voice template IDs
+            templates = templates.filter(template => config.features.voiceTemplateIds.includes(template.id));
+        } else {
+            // For other channels, exclude voice-specific templates
+            templates = templates.filter(template => !config.features.voiceTemplateIds.includes(template.id));
         }
-        return config.messageTemplates.filter(template => template.category === activeCategory);
+        
+        // Then filter by category
+        if (activeCategory === 'all') {
+            return templates;
+        }
+        return templates.filter(template => template.category === activeCategory);
     };
 
     const categories = ['all', ...Array.from(new Set(config.messageTemplates.map(t => t.category)))];
@@ -345,6 +413,8 @@ export default function DynamicSMSDemo() {
                             <p className="twilio-text text-xs mt-2" style={{ color: config.brandColors.text }}>
                                 {selectedChannel === 'sms' 
                                     ? '📱 Optional for SMS (required for real Twilio messages, demo works without)'
+                                    : selectedChannel === 'voice'
+                                    ? '📞 Required for real Voice calls (will make actual phone calls with your Twilio credentials)'
                                     : '📱 Optional for RCS/WhatsApp (mock messages only)'
                                 }
                             </p>
@@ -374,6 +444,7 @@ export default function DynamicSMSDemo() {
                                             {channel === 'sms' && '📱 SMS'}
                                             {channel === 'rcs' && '💬 RCS'}
                                             {channel === 'whatsapp' && '🟢 WhatsApp'}
+                                            {channel === 'voice' && '📞 Voice'}
                                         </button>
                                     ))}
                                 </div>

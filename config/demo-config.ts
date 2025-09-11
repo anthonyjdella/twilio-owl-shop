@@ -67,6 +67,20 @@ export interface VirtualPhoneConfig {
   contactName: string;
   messageTheme: string; // Theme ID
   apps: PhoneAppConfig[];
+  voiceSettings: {
+    autoEndCalls: boolean;
+    callDurationSeconds?: number;
+    showCallHistory: boolean;
+    maxCallHistoryItems: number;
+    enableMockContacts: boolean;
+    mockContacts: Array<{
+      id: string;
+      name: string;
+      number: string;
+      avatar: string;
+      company?: string;
+    }>;
+  };
 }
 
 export interface DemoConfig {
@@ -89,10 +103,16 @@ export interface DemoConfig {
     enableConfigPanel: boolean;
     enableJourneyFlow: boolean;
     enableChannelSelection: boolean;
-    availableChannels: ('sms' | 'rcs' | 'whatsapp')[];
-    defaultChannel: 'sms' | 'rcs' | 'whatsapp';
+    availableChannels: ('sms' | 'rcs' | 'whatsapp' | 'voice')[];
+    defaultChannel: 'sms' | 'rcs' | 'whatsapp' | 'voice';
     enableContentTypes: boolean;
     availableContentTypes: ('text' | 'media' | 'richCard' | 'carousel' | 'listMessage')[];
+    voiceTemplateIds: string[];
+    phoneSettings: {
+      defaultPhoneNumber: string;
+      enableRealCalls: boolean;
+      callAutoEndTime?: number;
+    };
   };
   
   // Layout Configuration
@@ -392,10 +412,25 @@ export const defaultDemoConfig: DemoConfig = {
     enableConfigPanel: true,
     enableJourneyFlow: true,
     enableChannelSelection: true,
-    availableChannels: ['sms', 'rcs', 'whatsapp'],
+    availableChannels: ['sms', 'rcs', 'whatsapp', 'voice'],
     defaultChannel: 'sms',
     enableContentTypes: true,
-    availableContentTypes: ['text', 'media', 'richCard', 'carousel', 'listMessage']
+    availableContentTypes: ['text', 'media', 'richCard', 'carousel', 'listMessage'],
+    voiceTemplateIds: [
+      'interactive-ivr', 
+      'appointment-reminder-voice', 
+      'delivery-notification-voice', 
+      'voice-survey-interactive', 
+      'payment-reminder-voice', 
+      'emergency-alert-voice', 
+      'conference-call-voice', 
+      'voice-authentication'
+    ],
+    phoneSettings: {
+      defaultPhoneNumber: '+1 (555) 123-4567',
+      enableRealCalls: true,
+      callAutoEndTime: undefined // undefined = manual hang up only
+    }
   },
   
   // Layout Configuration
@@ -682,6 +717,120 @@ export const defaultDemoConfig: DemoConfig = {
       variables: { otpCode: "{{randomOTP}}" },
       apiAction: "test-otp",
       buttonText: "Send OTP"
+    },
+
+    // ====== TWILIO VOICE DEMOS ======
+    {
+      id: "interactive-ivr",
+      title: "Interactive Voice Response (IVR)",
+      description: "Smart phone menus with voice prompts and keypad input",
+      emoji: "🎤",
+      category: "transactional",
+      messageContent: "Thank you for calling {{brandName}}! For Sales, press 1. For Support, press 2. For Billing, press 3. Or stay on the line to speak with an operator.",
+      variables: {},
+      apiAction: "ivr-demo",
+      buttonText: "Demo IVR System"
+    },
+    
+    {
+      id: "appointment-reminder-voice",
+      title: "Voice Appointment Reminder",
+      description: "Automated appointment reminders with confirmation options",
+      emoji: "📅",
+      category: "notification",
+      messageContent: "Hello! This is {{brandName}} calling to remind you of your {{appointmentType}} appointment scheduled for {{appointmentDate}} at {{appointmentTime}}. Press 1 to confirm, or press 2 to reschedule.",
+      variables: {
+        appointmentType: "consultation",
+        appointmentDate: "tomorrow",
+        appointmentTime: "2:30 PM"
+      },
+      apiAction: "appointment-reminder-voice",
+      buttonText: "Send Voice Reminder"
+    },
+
+    {
+      id: "delivery-notification-voice",
+      title: "Delivery Status Call",
+      description: "Real-time delivery updates via voice calls",
+      emoji: "📦",
+      category: "transactional", 
+      messageContent: "Hi! This is {{brandName}} with an update on order {{orderNumber}}. Your {{orderItems}} will be delivered today between {{deliveryWindow}}. Press 1 if someone will be home, or press 2 to reschedule.",
+      variables: {
+        orderNumber: "12345",
+        orderItems: "Owl Hoodie and Coffee Mug",
+        deliveryWindow: "2-4 PM"
+      },
+      apiAction: "delivery-notification-voice",
+      buttonText: "Call About Delivery"
+    },
+
+    {
+      id: "voice-survey-interactive",
+      title: "Interactive Voice Survey",
+      description: "Collect customer feedback through voice and keypad",
+      emoji: "📊",
+      category: "marketing",
+      messageContent: "Hello! This is {{brandName}}. We'd love your feedback! On a scale of 1 to 5, how would you rate your recent experience? Press 1 for poor, up to 5 for excellent. Or press 9 to leave a voice message.",
+      variables: {},
+      apiAction: "voice-survey-interactive",
+      buttonText: "Conduct Voice Survey"
+    },
+
+    {
+      id: "payment-reminder-voice",
+      title: "Payment Due Notification",
+      description: "Automated payment reminders with pay-by-phone option",
+      emoji: "💳",
+      category: "transactional",
+      messageContent: "This is {{brandName}} calling about your account. Your payment of ${{amount}} was due on {{dueDate}}. Press 1 to pay by phone now, or press 2 to set up a payment plan.",
+      variables: {
+        amount: "99.50",
+        dueDate: "January 15th"
+      },
+      apiAction: "payment-reminder-voice",
+      buttonText: "Payment Reminder Call"
+    },
+
+    {
+      id: "emergency-alert-voice",
+      title: "Emergency Voice Alert",
+      description: "Mass voice notifications for urgent alerts and emergencies",
+      emoji: "🚨",
+      category: "notification",
+      messageContent: "This is an emergency notification from {{brandName}}. {{alertMessage}} This is not a test. Please follow all safety protocols immediately. This message will repeat.",
+      variables: {
+        alertMessage: "A severe weather warning is in effect for your area until 8 PM tonight."
+      },
+      apiAction: "emergency-alert-voice",
+      buttonText: "Send Emergency Alert"
+    },
+
+    {
+      id: "conference-call-voice",
+      title: "Conference Call Invitation",
+      description: "Automated conference call setup and participant connection",
+      emoji: "👥",
+      category: "transactional",
+      messageContent: "Welcome to the {{brandName}} conference call for {{meetingTopic}}. You will be connected shortly. Press star 6 to mute or unmute yourself during the meeting.",
+      variables: {
+        meetingTopic: "Q4 Planning Session"
+      },
+      apiAction: "conference-call-voice",
+      buttonText: "Start Conference Call"
+    },
+
+    {
+      id: "voice-authentication",
+      title: "Voice Security Verification",
+      description: "Two-factor authentication via voice calls",
+      emoji: "🔐",
+      category: "authentication",
+      messageContent: "This is {{brandName}} security. We've detected a login attempt on your account. Your verification code is {{verificationCode}}. Press 1 to approve this login, or press 2 to deny and secure your account.",
+      variables: {
+        verificationCode: "7-4-9-2-1-8"
+      },
+      apiAction: "voice-authentication",
+      buttonText: "Voice Security Check"
     }
   ],
   
@@ -718,7 +867,37 @@ export const defaultDemoConfig: DemoConfig = {
         backgroundColor: "#25D366", 
         textColor: "#FFFFFF"
       }
-    ]
+    ],
+    voiceSettings: {
+      autoEndCalls: false, // Manual hang up only
+      callDurationSeconds: undefined, // Unlimited duration
+      showCallHistory: true,
+      maxCallHistoryItems: 10,
+      enableMockContacts: true,
+      mockContacts: [
+        {
+          id: '1',
+          name: 'Demo Contact',
+          number: '+1 (555) 123-4567',
+          avatar: '👤',
+          company: 'Twilio'
+        },
+        {
+          id: '2',
+          name: 'Support Team',
+          number: '+1 (555) 987-6543',
+          avatar: '🛟',
+          company: 'Help Desk'
+        },
+        {
+          id: '3',
+          name: 'Sales Team',
+          number: '+1 (555) 111-2222',
+          avatar: '💼',
+          company: 'Sales'
+        }
+      ]
+    }
   },
   
   messageThemes: [

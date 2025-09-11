@@ -6,8 +6,9 @@ import { DemoConfig, getMessageTheme, MessageTemplate } from "@/config/demo-conf
 // Extend Window interface to include our custom property
 declare global {
   interface Window {
-    virtualPhoneReceiveMessage?: (content: string, messageId?: string, channel?: 'sms' | 'rcs' | 'whatsapp', template?: MessageTemplate) => void;
-    virtualPhoneSwitchApp?: (channel: 'sms' | 'rcs' | 'whatsapp') => void;
+    virtualPhoneReceiveMessage?: (content: string, messageId?: string, channel?: 'sms' | 'rcs' | 'whatsapp' | 'voice', template?: MessageTemplate) => void;
+    virtualPhoneSwitchApp?: (channel: 'sms' | 'rcs' | 'whatsapp' | 'voice') => void;
+    virtualPhoneInitiateCall?: (number: string, name?: string) => void;
   }
 }
 
@@ -28,6 +29,23 @@ interface Message {
   listMessage?: { header: string; footer: string; buttonText: string; sections: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }> };
 }
 
+interface CallRecord {
+  id: string;
+  number: string;
+  name?: string;
+  type: 'incoming' | 'outgoing' | 'missed';
+  timestamp: Date;
+  duration?: number;
+}
+
+interface Contact {
+  id: string;
+  name: string;
+  number: string;
+  avatar?: string;
+  company?: string;
+}
+
 interface VirtualPhoneProps {
   config: DemoConfig;
   onMessageReceived?: (message: Message) => void;
@@ -41,6 +59,48 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   const [currentTime, setCurrentTime] = useState(config.virtualPhone.currentTime);
   const [showContactProfile, setShowContactProfile] = useState(false);
   const [whatsAppView, setWhatsAppView] = useState<'chats' | 'chat' | 'profile'>('chats');
+  
+  // Phone app state
+  const [phoneView, setPhoneView] = useState<'dialer' | 'contacts' | 'recent' | 'favorites'>('dialer');
+  const [dialedNumber, setDialedNumber] = useState('');
+  const [isInCall, setIsInCall] = useState(false);
+  const [currentCall, setCurrentCall] = useState<CallRecord | null>(null);
+  const [callDuration, setCallDuration] = useState(0);
+  const [callHistory, setCallHistory] = useState<CallRecord[]>([
+    {
+      id: '1',
+      number: '+1 (555) 123-4567',
+      name: 'Demo Contact',
+      type: 'incoming',
+      timestamp: new Date(Date.now() - 3600000),
+      duration: 245
+    },
+    {
+      id: '2', 
+      number: '+1 (555) 987-6543',
+      name: 'Support Team',
+      type: 'outgoing',
+      timestamp: new Date(Date.now() - 7200000),
+      duration: 120
+    },
+    {
+      id: '3',
+      number: '+1 (555) 246-8101',
+      type: 'missed',
+      timestamp: new Date(Date.now() - 10800000),
+    }
+  ]);
+  const [contacts] = useState<Contact[]>(
+    config.virtualPhone.voiceSettings.enableMockContacts 
+      ? config.virtualPhone.voiceSettings.mockContacts.map(contact => ({
+          id: contact.id,
+          name: contact.name,
+          number: contact.number,
+          avatar: contact.avatar,
+          company: contact.company
+        }))
+      : []
+  );
 
   // Update time every minute
   useEffect(() => {
@@ -55,8 +115,23 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     return () => clearInterval(timer);
   }, []);
 
+  // Handle call duration timer
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isInCall && currentCall) {
+      setCallDuration(0); // Reset duration when call starts
+      timer = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    }
+    
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isInCall, currentCall]);
+
   // Function to receive a new message from the demo
-  const receiveMessage = useCallback((content: string, messageId?: string, channel: 'sms' | 'rcs' | 'whatsapp' = 'sms', template?: MessageTemplate) => {
+  const receiveMessage = useCallback((content: string, messageId?: string, channel: 'sms' | 'rcs' | 'whatsapp' | 'voice' = 'sms', template?: MessageTemplate) => {
     // Create rich message based on template and channel
     const newMessage: Message = {
       id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -197,6 +272,17 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
       if (currentApp !== 'whatsapp') {
         setCurrentApp('whatsapp');
       }
+    } else if (channel === 'voice') {
+      // Voice channel should initiate a call instead of sending a message
+      const number = config.features.phoneSettings.defaultPhoneNumber;
+      const name = 'Demo Call';
+      initiateCall(number);
+      
+      // Switch to Phone app
+      if (currentApp !== 'phone') {
+        setCurrentApp('phone');
+      }
+      return; // Don't process as message
     } else {
       // SMS and RCS go to Messages app
       setMessages(prev => [...prev, newMessage]);
@@ -219,7 +305,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   }, [currentApp, isScreenOn, onMessageReceived]);
 
   // Function to switch apps based on channel
-  const switchApp = useCallback((channel: 'sms' | 'rcs' | 'whatsapp') => {
+  const switchApp = useCallback((channel: 'sms' | 'rcs' | 'whatsapp' | 'voice') => {
     // Turn on screen if it's off
     if (!isScreenOn) {
       setIsScreenOn(true);
@@ -234,6 +320,9 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
       } else {
         setWhatsAppView('chats');
       }
+    } else if (channel === 'voice') {
+      // Voice channel goes to phone app
+      setCurrentApp('phone');
     } else {
       // SMS and RCS both go to messages app
       setCurrentApp('messages');
@@ -244,10 +333,15 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   useEffect(() => {
     window.virtualPhoneReceiveMessage = receiveMessage;
     window.virtualPhoneSwitchApp = switchApp;
+    window.virtualPhoneInitiateCall = (number: string, name?: string) => {
+      initiateCall(number);
+      setCurrentApp('phone');
+    };
     
     return () => {
       delete window.virtualPhoneReceiveMessage;
       delete window.virtualPhoneSwitchApp;
+      delete window.virtualPhoneInitiateCall;
     };
   }, [receiveMessage, switchApp]);
 
@@ -682,33 +776,343 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     );
   };
 
-  const renderPhoneApp = () => (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Phone Header */}
-      <div className="bg-gray-100 border-b border-gray-200 p-3 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <button 
-            onClick={() => setCurrentApp(config.virtualPhone.defaultApp)}
-            className="text-blue-500 text-sm"
-          >
-            ← Back
-          </button>
-          <h3 className="font-semibold text-gray-900">Phone</h3>
-          <div className="w-8" />
+  // Phone app helper functions
+  const formatPhoneNumber = (number: string) => {
+    const cleaned = number.replace(/\D/g, '');
+    const match = cleaned.match(/^(\d{1})(\d{3})(\d{3})(\d{4})$/);
+    if (match) {
+      return `+${match[1]} (${match[2]}) ${match[3]}-${match[4]}`;
+    }
+    return number;
+  };
+
+  const handleDialerInput = (digit: string) => {
+    if (digit === 'delete') {
+      setDialedNumber(prev => prev.slice(0, -1));
+    } else if (digit === 'call') {
+      if (dialedNumber) {
+        initiateCall(dialedNumber);
+      }
+    } else {
+      setDialedNumber(prev => prev + digit);
+    }
+  };
+
+  const initiateCall = (number: string) => {
+    const call: CallRecord = {
+      id: Date.now().toString(),
+      number: formatPhoneNumber(number),
+      type: 'outgoing',
+      timestamp: new Date()
+    };
+    setCurrentCall(call);
+    setIsInCall(true);
+  };
+
+  const endCall = (duration?: number) => {
+    if (currentCall) {
+      const completedCall = { ...currentCall, duration };
+      setCallHistory(prev => {
+        const newHistory = [completedCall, ...prev];
+        // Limit call history based on config
+        return newHistory.slice(0, config.virtualPhone.voiceSettings.maxCallHistoryItems);
+      });
+    }
+    setCurrentCall(null);
+    setIsInCall(false);
+    setDialedNumber('');
+  };
+
+  const renderPhoneApp = () => {
+    if (isInCall && currentCall) {
+      return renderInCallScreen();
+    }
+
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Phone Header */}
+        <div className="bg-gray-50 border-b border-gray-200 p-2 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <button 
+              onClick={() => setCurrentApp(config.virtualPhone.defaultApp)}
+              className="text-blue-500 text-sm"
+            >
+              ← Back
+            </button>
+            <h3 className="font-semibold text-gray-900 text-sm">Phone</h3>
+            <div className="w-8" />
+          </div>
+        </div>
+
+        {/* Phone Navigation */}
+        <div className="bg-white border-b border-gray-200 px-1 py-1 flex-shrink-0">
+          <div className="flex justify-around">
+            {[
+              { key: 'favorites', label: '⭐', title: 'Favorites' },
+              ...(config.virtualPhone.voiceSettings.showCallHistory ? [{ key: 'recent', label: '🕒', title: 'Recent' }] : []),
+              { key: 'contacts', label: '👤', title: 'Contacts' },
+              { key: 'dialer', label: '⌨️', title: 'Keypad' }
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setPhoneView(tab.key as any)}
+                className={`flex-1 flex flex-col items-center py-1 px-1 ${
+                  phoneView === tab.key ? 'text-blue-500' : 'text-gray-500'
+                }`}
+                title={tab.title}
+              >
+                <span className="text-sm">{tab.label}</span>
+                <span className="text-xs mt-0.5">{tab.title}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Phone Content */}
+        <div className="flex-1 overflow-hidden">
+          {phoneView === 'dialer' && renderDialer()}
+          {phoneView === 'recent' && renderCallHistory()}
+          {phoneView === 'contacts' && renderContacts()}
+          {phoneView === 'favorites' && renderFavorites()}
         </div>
       </div>
+    );
+  };
 
-      {/* Phone Interface */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-hidden">
-        <div className="text-4xl mb-4">📞</div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Phone App</h3>
-        <p className="text-center text-gray-500 text-xs px-4">
-          Demo phone interface<br />
-          Call functionality not implemented
-        </p>
+  const renderDialer = () => (
+    <div className="flex-1 flex flex-col bg-white">
+      {/* Dialed Number Display */}
+      <div className="px-2 py-1 text-center border-b border-gray-100">
+        <div className="text-xs font-light text-gray-900 min-h-[1rem] flex items-center justify-center">
+          {dialedNumber || <span className="text-gray-400 text-xs">Enter number</span>}
+        </div>
+        {dialedNumber && (
+          <div className="text-xs text-gray-500">
+            {formatPhoneNumber(dialedNumber)}
+          </div>
+        )}
+      </div>
+
+      {/* Number Pad */}
+      <div className="flex-1 px-2 py-1">
+        <div className="grid grid-cols-3 gap-1 max-w-[140px] mx-auto">
+          {[
+            ['1', ''], ['2', 'ABC'], ['3', 'DEF'],
+            ['4', 'GHI'], ['5', 'JKL'], ['6', 'MNO'],
+            ['7', 'PQRS'], ['8', 'TUV'], ['9', 'WXYZ'],
+            ['*', ''], ['0', '+'], ['#', '']
+          ].map(([digit, letters]) => (
+            <button
+              key={digit}
+              onClick={() => handleDialerInput(digit)}
+              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 active:bg-gray-300 transition-colors flex flex-col items-center justify-center"
+            >
+              <span className="text-xs font-semibold text-gray-900">{digit}</span>
+              {letters && <span className="text-xs text-gray-500 -mt-1 leading-none text-center" style={{fontSize: '8px'}}>{letters}</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex justify-center items-center mt-2 space-x-3">
+          {dialedNumber ? (
+            <button
+              onClick={() => handleDialerInput('delete')}
+              className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 active:bg-gray-300 transition-colors flex items-center justify-center"
+            >
+              <span className="text-xs">⌫</span>
+            </button>
+          ) : (
+            <div className="w-7 h-7" />
+          )}
+          
+          <button
+            onClick={() => handleDialerInput('call')}
+            disabled={!dialedNumber}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+              dialedNumber 
+                ? 'bg-green-500 hover:bg-green-600 active:bg-green-700 text-white shadow-lg' 
+                : 'bg-gray-300 text-gray-500 border border-gray-400'
+            }`}
+          >
+            <span className="text-sm">📞</span>
+          </button>
+          
+          <div className="w-7 h-7" />
+        </div>
       </div>
     </div>
   );
+
+  const renderContacts = () => (
+    <div className="flex-1 bg-white overflow-y-auto">
+      <div className="divide-y divide-gray-100">
+        {contacts.map((contact) => (
+          <div key={contact.id} className="px-3 py-2 hover:bg-gray-50">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-sm">{contact.avatar}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{contact.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{contact.company}</p>
+                    <p className="text-xs text-gray-400 truncate">{contact.number}</p>
+                  </div>
+                  <button
+                    onClick={() => initiateCall(contact.number)}
+                    className="ml-2 w-7 h-7 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center flex-shrink-0"
+                  >
+                    <span className="text-white text-xs">📞</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        {contacts.length === 0 && (
+          <div className="px-3 py-6 text-center">
+            <div className="text-2xl mb-2">👤</div>
+            <p className="text-xs text-gray-500">No contacts</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderCallHistory = () => (
+    <div className="flex-1 bg-white overflow-y-auto">
+      <div className="divide-y divide-gray-100">
+        {callHistory.map((call) => (
+          <div key={call.id} className="px-3 py-2 hover:bg-gray-50">
+            <div className="flex items-center space-x-2">
+              <div className="flex-shrink-0">
+                {call.type === 'incoming' && <span className="text-green-500 text-sm">📞</span>}
+                {call.type === 'outgoing' && <span className="text-blue-500 text-sm">📞</span>}
+                {call.type === 'missed' && <span className="text-red-500 text-sm">📞</span>}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {call.name || 'Unknown'}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">{call.number}</p>
+                    <div className="flex items-center space-x-2 mt-0.5">
+                      <p className="text-xs text-gray-400">
+                        {call.timestamp.toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                      {call.duration && (
+                        <p className="text-xs text-gray-400">
+                          • {Math.floor(call.duration / 60)}:{(call.duration % 60).toString().padStart(2, '0')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => initiateCall(call.number)}
+                    className="ml-2 w-7 h-7 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center flex-shrink-0"
+                  >
+                    <span className="text-white text-xs">📞</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        {callHistory.length === 0 && (
+          <div className="px-3 py-6 text-center">
+            <div className="text-2xl mb-2">🕒</div>
+            <p className="text-xs text-gray-500">No recent calls</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderFavorites = () => (
+    <div className="flex-1 bg-white overflow-y-auto">
+      <div className="px-3 py-6 text-center">
+        <div className="text-2xl mb-2">⭐</div>
+        <p className="text-xs text-gray-500">No favorites</p>
+        <p className="text-xs text-gray-400 mt-1">Add contacts to favorites for quick access</p>
+      </div>
+    </div>
+  );
+
+  const renderInCallScreen = () => {
+    if (!currentCall) return null;
+
+    const formatDuration = (seconds: number) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    return (
+      <div className="flex-1 flex flex-col bg-gradient-to-b from-green-400 to-green-600 text-white">
+        {/* Call Info */}
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          <div className="text-center mb-6">
+            <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center mb-3 mx-auto">
+              <span className="text-4xl">👤</span>
+            </div>
+            <h2 className="text-lg font-light mb-1">
+              {currentCall.name || 'Unknown Contact'}
+            </h2>
+            <p className="text-sm opacity-90 mb-1">{currentCall.number}</p>
+            <p className="text-xs opacity-75">
+              {currentCall.type === 'incoming' ? 'Incoming call' : 'Connected'}
+            </p>
+            <p className="text-lg font-mono mt-2">{formatDuration(callDuration)}</p>
+          </div>
+        </div>
+
+        {/* Call Controls */}
+        <div className="p-4">
+          <div className="flex justify-center items-center space-x-4">
+            {/* Mute */}
+            <button className="w-12 h-12 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center transition-colors">
+              <span className="text-lg">🔇</span>
+            </button>
+            
+            {/* End Call */}
+            <button
+              onClick={() => endCall(callDuration)}
+              className="w-16 h-16 bg-red-500 hover:bg-red-600 active:bg-red-700 rounded-full flex items-center justify-center transition-colors shadow-lg"
+              title="Hang Up"
+            >
+              <span className="text-2xl">📞</span>
+            </button>
+            
+            {/* Speaker */}
+            <button className="w-12 h-12 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center transition-colors">
+              <span className="text-lg">🔊</span>
+            </button>
+          </div>
+
+          {/* Additional Controls */}
+          <div className="flex justify-center items-center space-x-4 mt-3">
+            <button className="w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center transition-colors">
+              <span className="text-sm">⌨️</span>
+            </button>
+            <button className="w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center transition-colors">
+              <span className="text-sm">➕</span>
+            </button>
+            <button className="w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center transition-colors">
+              <span className="text-sm">📱</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderWhatsAppApp = () => {
 

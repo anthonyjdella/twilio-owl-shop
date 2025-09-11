@@ -25,7 +25,7 @@ export const mySampleConfig: DemoConfig = {
     enableConfigPanel: true,       // Show config panel
     enableJourneyFlow: true,       // Show customer journey
     enableChannelSelection: true,  // Show channel selector
-    availableChannels: ['sms', 'rcs', 'whatsapp'], // Which channels to show
+    availableChannels: ['sms', 'rcs', 'whatsapp', 'voice'], // Which channels to show
     defaultChannel: 'sms',         // Default selected channel
     enableContentTypes: true,      // Show content type options
     availableContentTypes: ['text', 'richCard', 'carousel'] // Which content types to show
@@ -313,6 +313,73 @@ export const mySampleConfig: DemoConfig = {
       variables: { verificationCode: "123456" },
       apiAction: "verification",
       buttonText: "Send Code"
+    },
+
+    // ====== VOICE-SPECIFIC TEMPLATES ======
+    {
+      id: "outbound-call",
+      title: "Outbound Sales Call",
+      description: "Make a sales call to prospect",
+      emoji: "📞",
+      category: "marketing",
+      messageContent: "Hello! This is a call from {{brandName}}. We have an exciting offer for you about our services.",
+      variables: {},
+      apiAction: "outbound-call",
+      buttonText: "Make Sales Call"
+    },
+    
+    {
+      id: "appointment-reminder-call",
+      title: "Appointment Reminder Call",
+      description: "Call customer about upcoming appointment",
+      emoji: "📅",
+      category: "notification",
+      messageContent: "Hi! This is {{brandName}} calling to remind you about your {{serviceType}} appointment scheduled for {{appointmentTime}}.",
+      variables: {
+        serviceType: "consultation",
+        appointmentTime: "tomorrow at 2PM"
+      },
+      apiAction: "appointment-call",
+      buttonText: "Call for Reminder"
+    },
+    
+    {
+      id: "support-callback",
+      title: "Support Callback",
+      description: "Return customer support call",
+      emoji: "🛟",
+      category: "transactional",
+      messageContent: "Hello! This is {{brandName}} support calling you back regarding your recent inquiry. How can we help you today?",
+      variables: {},
+      apiAction: "support-callback",
+      buttonText: "Call Customer Back"
+    },
+    
+    {
+      id: "order-confirmation-call",
+      title: "Order Confirmation Call",
+      description: "Call to confirm order details",
+      emoji: "📦",
+      category: "transactional",
+      messageContent: "Hi! This is {{brandName}} calling to confirm your recent order #{{orderNumber}}. Your order total is ${{orderTotal}}.",
+      variables: {
+        orderNumber: "12345",
+        orderTotal: "99.99"
+      },
+      apiAction: "order-confirmation-call",
+      buttonText: "Confirm Order"
+    },
+    
+    {
+      id: "survey-call",
+      title: "Customer Survey Call",
+      description: "Call for customer feedback",
+      emoji: "📊",
+      category: "marketing",
+      messageContent: "Hello! This is {{brandName}}. We'd love to get your feedback on our recent service. Do you have 2 minutes for a quick survey?",
+      variables: {},
+      apiAction: "survey-call",
+      buttonText: "Conduct Survey"
     }
   ],
   
