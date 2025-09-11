@@ -28,6 +28,15 @@ A professional, modern e-commerce web application built with Next.js 15, featuri
 -   **Post-Purchase Surveys**: Customer feedback collection
 -   **SMS Consent Management**: TCPA-compliant opt-in/opt-out system
 
+### 🎛️ Dynamic SMS Demo (New!)
+
+-   **Fully Configurable Demo**: Customize everything via config files
+-   **Virtual Phone Preview**: See how messages appear on mobile devices
+-   **Rich Messaging Support**: RCS and WhatsApp interactive content
+-   **Brand Customization**: Colors, text, and layouts
+-   **No-Code Setup**: Clone and customize in minutes
+-   **📖 [Configuration Guide](config/CONFIG-GUIDE.md)** | **⚡ [Quick Start](config/QUICK-START.md)**
+
 ### 🎨 Professional Design
 
 -   **Modern UI/UX**: High-end luxury retail aesthetic
@@ -186,6 +195,13 @@ twilio-owl-shop/
 
 5. **Open your browser**
    Navigate to `http://localhost:3000` (or the port shown in terminal)
+
+### 🎛️ Try the Dynamic SMS Demo
+
+Visit `/dynamic-sms-demo` to explore the fully configurable SMS demo:
+- **Live Demo**: `http://localhost:3000/dynamic-sms-demo`  
+- **Customize**: Copy `config/sample-config.ts` to `config/my-demo.ts` and modify
+- **Full Guide**: See `config/QUICK-START.md` for 5-minute setup
 
 ## 🌐 Production Deployment
 

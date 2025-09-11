@@ -19,11 +19,13 @@ interface Message {
   delivered: boolean;
   read: boolean;
   channel?: 'sms' | 'rcs' | 'whatsapp';
-  type?: 'text' | 'quick_replies' | 'carousel' | 'card';
+  type?: 'text' | 'quick_replies' | 'carousel' | 'card' | 'media' | 'listMessage';
   template?: any;
   quickReplies?: Array<{ id: string; title: string }>;
-  carousel?: Array<{ id: string; image: string; title: string; subtitle: string; price: string; buttons: Array<{ title: string; type: string }> }>;
-  card?: { image: string; title: string; subtitle: string; buttons: Array<{ title: string; type: string }> };
+  carousel?: Array<{ id: string; image: string; title: string; subtitle: string; buttons: Array<{ title: string; type: string }> }>;
+  card?: { image: string; title: string; subtitle: string; body?: string; buttons?: Array<{ title: string; type: string; url?: string; payload?: string }>; quickReplies?: Array<{ title: string; payload?: string }> };
+  media?: { url: string; type: 'image' | 'video' | 'audio' | 'document'; caption?: string };
+  listMessage?: { header: string; footer: string; buttonText: string; sections: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }> };
 }
 
 interface VirtualPhoneProps {
@@ -75,58 +77,106 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
         
         // Configure rich content based on the selected type
         switch (template.selectedContentType) {
-          case 'quick_replies':
-            newMessage.quickReplies = template.richMessageConfig.replies || [
-              { id: '1', title: '🛍️ Shop Now' },
-              { id: '2', title: '📞 Call Us' },
-              { id: '3', title: '💬 Chat' }
-            ];
-            break;
-            
-          case 'card':
+          case 'richCard':
+            newMessage.type = 'card';
+            // Determine which interactive type to use - either buttons OR quick replies
+            const useButtons = template.contentTypeConfig?.interactiveType !== 'quickReplies';
             newMessage.card = {
-              image: template.richMessageConfig.cardImage || '🛒',
-              title: template.richMessageConfig.cardTitle || 'Special Offer!',
-              subtitle: template.richMessageConfig.cardSubtitle || 'Limited time deal - Don\'t miss out!',
-              buttons: template.richMessageConfig.buttons || [
-                { title: 'Shop Now', type: 'url' },
-                { title: 'Learn More', type: 'action' }
-              ]
+              image: template.contentTypeConfig?.cardImage || template.richMessageConfig.cardImage || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
+              title: template.contentTypeConfig?.cardTitle || template.richMessageConfig.cardTitle || 'Special Offer!',
+              subtitle: template.contentTypeConfig?.cardSubtitle || template.richMessageConfig.cardSubtitle || 'Limited time deal - Don\'t miss out!',
+              body: template.contentTypeConfig?.cardBody || template.richMessageConfig.cardBody,
+              buttons: useButtons ? (
+                template.contentTypeConfig?.buttons?.length > 0 
+                  ? template.contentTypeConfig.buttons.map(b => ({ 
+                      title: b.title, 
+                      type: b.type, 
+                      url: b.type === 'url' ? b.payload : undefined,
+                      payload: b.type !== 'url' ? b.payload : undefined 
+                    }))
+                  : template.richMessageConfig.buttons || [
+                      { title: 'Shop Now', type: 'url', url: 'https://owlshop.com' },
+                      { title: 'Call Us', type: 'phone', payload: '+1-833-365-9260' },
+                      { title: 'More Info', type: 'reply', payload: 'more_info' }
+                    ]
+              ) : undefined,
+              quickReplies: !useButtons ? (
+                template.contentTypeConfig?.quickReplies?.length > 0 
+                  ? template.contentTypeConfig.quickReplies
+                  : template.richMessageConfig.quickReplies || [
+                      { title: 'Yes, I\'m interested', payload: 'interested' },
+                      { title: 'Not now', payload: 'not_now' },
+                      { title: 'Tell me more', payload: 'more_info' }
+                    ]
+              ) : undefined
             };
             break;
             
           case 'carousel':
-            newMessage.carousel = template.richMessageConfig.items || [
-              {
-                id: '1',
-                image: '🦉',
-                title: 'Owl Hoodie',
-                subtitle: 'Premium comfort hoodie',
-                price: '$49.99',
-                buttons: [{ title: 'Buy Now', type: 'url' }]
-              },
-              {
-                id: '2',
-                image: '👔',
-                title: 'Dev T-Shirt',
-                subtitle: 'Perfect for coding',
-                price: '$29.99',
-                buttons: [{ title: 'Buy Now', type: 'url' }]
-              },
-              {
-                id: '3',
-                image: '☕',
-                title: 'Code Mug',
-                subtitle: 'Fuel your coding',
-                price: '$19.99',
-                buttons: [{ title: 'Buy Now', type: 'url' }]
-              }
-            ];
+            // Use user-defined carousel items if available, otherwise fallback to defaults
+            newMessage.carousel = template.contentTypeConfig?.carouselItems?.length > 0
+              ? template.contentTypeConfig.carouselItems
+              : template.richMessageConfig.items || [
+                  {
+                    id: '1',
+                    image: '🦉',
+                    title: 'Owl Hoodie',
+                    subtitle: 'Premium comfort hoodie',
+                    buttons: [{ title: 'Buy Now', type: 'url' }]
+                  },
+                  {
+                    id: '2',
+                    image: '👔',
+                    title: 'Dev T-Shirt',
+                    subtitle: 'Perfect for coding',
+                    buttons: [{ title: 'Buy Now', type: 'url' }]
+                  },
+                  {
+                    id: '3',
+                    image: '☕',
+                    title: 'Code Mug',
+                    subtitle: 'Fuel your coding',
+                    buttons: [{ title: 'Buy Now', type: 'url' }]
+                  }
+                ];
             break;
             
           case 'media':
-            // Media messages just use text type but could be enhanced with actual media URLs
-            newMessage.type = 'text';
+            newMessage.type = 'media';
+            if (template.contentTypeConfig) {
+              newMessage.media = {
+                url: template.contentTypeConfig.mediaUrl || template.richMessageConfig.mediaUrl || '',
+                type: template.contentTypeConfig.mediaType || template.richMessageConfig.mediaType || 'image',
+                caption: template.contentTypeConfig.caption || template.richMessageConfig.caption || ''
+              };
+            }
+            break;
+            
+          case 'listMessage':
+            newMessage.type = 'listMessage';
+            newMessage.listMessage = {
+              header: template.contentTypeConfig?.listHeader || template.richMessageConfig.header || 'Choose Your Product Category',
+              footer: template.contentTypeConfig?.listFooter || template.richMessageConfig.footer || 'Select an option to continue',
+              buttonText: template.contentTypeConfig?.buttonText || template.richMessageConfig.buttonText || 'View Products',
+              sections: template.contentTypeConfig?.listSections?.length > 0
+                ? template.contentTypeConfig.listSections
+                : template.richMessageConfig.sections || [
+                    {
+                      title: "Clothing",
+                      rows: [
+                        { id: "hoodies", title: "Hoodies", description: "Comfortable and stylish hoodies" },
+                        { id: "tshirts", title: "T-Shirts", description: "Perfect for everyday wear" }
+                      ]
+                    },
+                    {
+                      title: "Accessories",
+                      rows: [
+                        { id: "mugs", title: "Mugs", description: "Coffee mugs for developers" },
+                        { id: "stickers", title: "Stickers", description: "Laptop stickers and decals" }
+                      ]
+                    }
+                  ]
+            };
             break;
             
           case 'text':
@@ -396,7 +446,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                 return (
                   <div key={message.id} className="flex flex-col">
                     <div 
-                      className={`max-w-[85%] ${
+                      className={`max-w-[95%] ${
                         isUser ? 'self-end' : 'self-start'
                       } ${isRichMessage ? 'min-w-0' : 'px-3 py-2'}`}
                       style={!isRichMessage ? {
@@ -409,6 +459,51 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                       {/* Regular text message */}
                       {(!isRichMessage || message.type === 'text') && (
                         <p className="text-xs leading-tight break-words">{message.content}</p>
+                      )}
+                      
+                      {/* Media Message */}
+                      {message.type === 'media' && message.media && (
+                        <div className="bg-white rounded-lg p-2 shadow-sm border max-w-full">
+                          {message.media.caption && (
+                            <p className="text-xs text-gray-900 mb-2 break-words">{message.content}</p>
+                          )}
+                          {message.media.type === 'image' && message.media.url && (
+                            <div className="relative">
+                              <img 
+                                src={message.media.url} 
+                                alt="Media content"
+                                className="max-w-full h-auto rounded border"
+                                style={{ maxHeight: '200px' }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling!.style.display = 'block';
+                                }}
+                              />
+                              <div className="hidden bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
+                                🖼️ Image not available<br />
+                                <span className="text-xs break-all">{message.media.url}</span>
+                              </div>
+                            </div>
+                          )}
+                          {message.media.type === 'video' && message.media.url && (
+                            <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
+                              🎥 Video: {message.media.url}
+                            </div>
+                          )}
+                          {message.media.type === 'audio' && message.media.url && (
+                            <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
+                              🎵 Audio: {message.media.url}
+                            </div>
+                          )}
+                          {message.media.type === 'document' && message.media.url && (
+                            <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
+                              📄 Document: {message.media.url}
+                            </div>
+                          )}
+                          {message.media.caption && (
+                            <p className="text-xs text-gray-600 mt-2 break-words">{message.media.caption}</p>
+                          )}
+                        </div>
                       )}
                       
                       {/* Quick Replies (RCS only) */}
@@ -433,19 +528,64 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                         <div className="bg-white rounded-lg p-3 shadow-sm border">
                           <p className="text-xs text-gray-900 mb-2 break-words">{message.content}</p>
                           <div className="bg-gray-50 rounded-lg p-3 border">
-                            <div className="text-3xl text-center mb-2">{message.card.image}</div>
+                            {/* Card Image */}
+                            {message.card.image && message.card.image.startsWith('http') ? (
+                              <div className="mb-2">
+                                <img 
+                                  src={message.card.image} 
+                                  alt="Card image"
+                                  className="w-full h-32 object-cover rounded border"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.nextElementSibling!.style.display = 'block';
+                                  }}
+                                />
+                                <div className="hidden text-3xl text-center py-4">🖼️</div>
+                              </div>
+                            ) : (
+                              <div className="text-3xl text-center mb-2">{message.card.image || '🛒'}</div>
+                            )}
                             <h5 className="font-semibold text-sm mb-1">{message.card.title}</h5>
-                            <p className="text-xs text-gray-600 mb-3">{message.card.subtitle}</p>
-                            <div className="flex space-x-1">
-                              {message.card.buttons.map((button, idx) => (
-                                <button
-                                  key={idx}
-                                  className="flex-1 bg-blue-500 text-white text-xs py-2 rounded hover:bg-blue-600"
-                                >
-                                  {button.title}
-                                </button>
-                              ))}
-                            </div>
+                            <p className="text-xs text-gray-600 mb-2">{message.card.subtitle}</p>
+                            {message.card.body && (
+                              <p className="text-xs text-gray-700 mb-3 leading-relaxed">{message.card.body}</p>
+                            )}
+                            
+                            {/* Action Buttons */}
+                            {message.card.buttons && message.card.buttons.length > 0 && (
+                              <div className="flex space-x-1 mb-2">
+                                {message.card.buttons.map((button, idx) => (
+                                  <button
+                                    key={idx}
+                                    className={`flex-1 text-white text-xs py-2 rounded hover:opacity-80 ${
+                                      button.type === 'url' ? 'bg-blue-500' : 
+                                      button.type === 'phone' ? 'bg-green-500' : 'bg-gray-500'
+                                    }`}
+                                    title={button.type === 'url' ? button.url : button.payload}
+                                  >
+                                    {button.type === 'url' && '🔗 '}
+                                    {button.type === 'phone' && '📞 '}
+                                    {button.type === 'reply' && '💬 '}
+                                    {button.title}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {/* Quick Replies */}
+                            {message.card.quickReplies && message.card.quickReplies.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {message.card.quickReplies.map((reply, idx) => (
+                                  <button
+                                    key={idx}
+                                    className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200"
+                                    title={reply.payload}
+                                  >
+                                    {reply.title}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -454,17 +594,35 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                       {message.type === 'carousel' && message.carousel && (
                         <div className="bg-white rounded-lg p-2 shadow-sm border">
                           <p className="text-xs text-gray-900 mb-2 break-words">{message.content}</p>
+                          {message.template?.contentTypeConfig?.carouselBody && (
+                            <p className="text-xs text-gray-700 mb-2 leading-relaxed italic">{message.template.contentTypeConfig.carouselBody}</p>
+                          )}
                           <div className="flex space-x-1 overflow-x-auto pb-2 max-w-full">
                             {message.carousel.map((item) => (
-                              <div key={item.id} className="min-w-[100px] flex-shrink-0 bg-gray-50 rounded-lg p-2 border">
-                                <div className="text-lg text-center mb-1">{item.image}</div>
+                              <div key={item.id} className="min-w-[120px] flex-shrink-0 bg-gray-50 rounded-lg p-2 border">
+                                {/* Carousel Item Image */}
+                                {item.image && item.image.startsWith('http') ? (
+                                  <div className="mb-1">
+                                    <img 
+                                      src={item.image} 
+                                      alt={item.title}
+                                      className="w-full h-16 object-cover rounded border"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        e.currentTarget.nextElementSibling!.style.display = 'block';
+                                      }}
+                                    />
+                                    <div className="hidden text-lg text-center py-2">🖼️</div>
+                                  </div>
+                                ) : (
+                                  <div className="text-lg text-center mb-1">{item.image || '📦'}</div>
+                                )}
                                 <h5 className="font-semibold text-xs mb-1 truncate">{item.title}</h5>
-                                <p className="text-xs text-gray-600 mb-1 truncate">{item.subtitle}</p>
-                                <p className="font-bold text-xs text-green-600 mb-2">{item.price}</p>
+                                <p className="text-xs text-gray-600 mb-2 truncate">{item.subtitle}</p>
                                 {item.buttons.map((button, idx) => (
                                   <button
                                     key={idx}
-                                    className="w-full bg-green-500 text-white text-xs py-1 rounded hover:bg-green-600"
+                                    className="w-full bg-green-500 text-white text-xs py-1 rounded hover:bg-green-600 mb-1"
                                   >
                                     {button.title}
                                   </button>
@@ -679,9 +837,53 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
       
       return (
         <div key={message.id} className={`flex mb-2 ${isUser ? 'justify-end' : 'justify-start'} w-full`}>
-          <div className={`max-w-[85%] min-w-0 ${isUser ? 'bg-green-500 text-white' : 'bg-white text-gray-900'} rounded-lg p-2 shadow-sm relative overflow-hidden`}>
+          <div className={`max-w-[95%] min-w-0 ${isUser ? 'bg-green-500 text-white' : 'bg-white text-gray-900'} rounded-lg p-2 shadow-sm relative overflow-hidden`}>
             {message.type === 'text' && (
               <p className="text-sm break-words">{message.content}</p>
+            )}
+            
+            {message.type === 'media' && message.media && (
+              <div className="max-w-full">
+                {message.media.caption && (
+                  <p className="text-sm mb-2 break-words">{message.content}</p>
+                )}
+                {message.media.type === 'image' && message.media.url && (
+                  <div className="relative">
+                    <img 
+                      src={message.media.url} 
+                      alt="Media content"
+                      className="max-w-full h-auto rounded border"
+                      style={{ maxHeight: '200px' }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling!.style.display = 'block';
+                      }}
+                    />
+                    <div className="hidden bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
+                      🖼️ Image not available<br />
+                      <span className="text-xs break-all">{message.media.url}</span>
+                    </div>
+                  </div>
+                )}
+                {message.media.type === 'video' && message.media.url && (
+                  <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
+                    🎥 Video: {message.media.url}
+                  </div>
+                )}
+                {message.media.type === 'audio' && message.media.url && (
+                  <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
+                    🎵 Audio: {message.media.url}
+                  </div>
+                )}
+                {message.media.type === 'document' && message.media.url && (
+                  <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
+                    📄 Document: {message.media.url}
+                  </div>
+                )}
+                {message.media.caption && (
+                  <p className="text-sm text-gray-600 mt-2 break-words">{message.media.caption}</p>
+                )}
+              </div>
             )}
             
             {message.type === 'quick_replies' && (
@@ -703,17 +905,35 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             {message.type === 'carousel' && (
               <div>
                 <p className="text-sm mb-2 break-words">{message.content}</p>
+                {message.template?.contentTypeConfig?.carouselBody && (
+                  <p className="text-sm text-gray-700 mb-2 leading-relaxed italic">{message.template.contentTypeConfig.carouselBody}</p>
+                )}
                 <div className="flex space-x-1 overflow-x-auto pb-2 max-w-full">
                   {message.carousel.map((item: any) => (
-                    <div key={item.id} className="min-w-[100px] flex-shrink-0 bg-gray-50 rounded-lg p-2 border">
-                      <div className="text-lg text-center mb-1">{item.image}</div>
+                    <div key={item.id} className="min-w-[120px] flex-shrink-0 bg-gray-50 rounded-lg p-2 border">
+                      {/* Carousel Item Image */}
+                      {item.image && item.image.startsWith('http') ? (
+                        <div className="mb-1">
+                          <img 
+                            src={item.image} 
+                            alt={item.title}
+                            className="w-full h-16 object-cover rounded border"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.nextElementSibling!.style.display = 'block';
+                            }}
+                          />
+                          <div className="hidden text-lg text-center py-2">🖼️</div>
+                        </div>
+                      ) : (
+                        <div className="text-lg text-center mb-1">{item.image || '📦'}</div>
+                      )}
                       <h5 className="font-semibold text-xs mb-1 truncate">{item.title}</h5>
-                      <p className="text-xs text-gray-600 mb-1 truncate">{item.subtitle}</p>
-                      <p className="font-bold text-xs text-green-600 mb-2">{item.price}</p>
+                      <p className="text-xs text-gray-600 mb-2 truncate">{item.subtitle}</p>
                       {item.buttons.map((button: any, idx: number) => (
                         <button
                           key={idx}
-                          className="w-full bg-green-500 text-white text-xs py-1 rounded hover:bg-green-600"
+                          className="w-full bg-green-500 text-white text-xs py-1 rounded hover:bg-green-600 mb-1"
                         >
                           {button.title}
                         </button>
@@ -728,18 +948,118 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
               <div>
                 <p className="text-sm mb-2 break-words">{message.content}</p>
                 <div className="bg-gray-50 rounded-lg p-3 border">
-                  <div className="text-3xl text-center mb-2">{message.card.image}</div>
+                  {/* Card Image */}
+                  {message.card.image && message.card.image.startsWith('http') ? (
+                    <div className="mb-2">
+                      <img 
+                        src={message.card.image} 
+                        alt="Card image"
+                        className="w-full h-32 object-cover rounded border"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling!.style.display = 'block';
+                        }}
+                      />
+                      <div className="hidden text-3xl text-center py-4">🖼️</div>
+                    </div>
+                  ) : (
+                    <div className="text-3xl text-center mb-2">{message.card.image || '🛒'}</div>
+                  )}
                   <h5 className="font-semibold text-sm mb-1">{message.card.title}</h5>
-                  <p className="text-xs text-gray-600 mb-3">{message.card.subtitle}</p>
-                  <div className="flex space-x-1">
-                    {message.card.buttons.map((button: any, idx: number) => (
-                      <button
-                        key={idx}
-                        className="flex-1 bg-green-500 text-white text-xs py-2 rounded hover:bg-green-600"
-                      >
-                        {button.title}
-                      </button>
+                  <p className="text-xs text-gray-600 mb-2">{message.card.subtitle}</p>
+                  {message.card.body && (
+                    <p className="text-xs text-gray-700 mb-3 leading-relaxed">{message.card.body}</p>
+                  )}
+                  
+                  {/* Action Buttons */}
+                  {message.card.buttons && message.card.buttons.length > 0 && (
+                    <div className="flex space-x-1 mb-2">
+                      {message.card.buttons.map((button: any, idx: number) => (
+                        <button
+                          key={idx}
+                          className={`flex-1 text-white text-xs py-2 rounded hover:opacity-80 ${
+                            button.type === 'url' ? 'bg-blue-500' : 
+                            button.type === 'phone' ? 'bg-green-600' : 'bg-green-500'
+                          }`}
+                          title={button.type === 'url' ? button.url : button.payload}
+                        >
+                          {button.type === 'url' && '🔗 '}
+                          {button.type === 'phone' && '📞 '}
+                          {button.type === 'reply' && '💬 '}
+                          {button.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Quick Replies */}
+                  {message.card.quickReplies && message.card.quickReplies.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {message.card.quickReplies.map((reply: any, idx: number) => (
+                        <button
+                          key={idx}
+                          className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded hover:bg-green-200"
+                          title={reply.payload}
+                        >
+                          {reply.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {message.type === 'listMessage' && (
+              <div>
+                <p className="text-sm mb-2 break-words">{message.content}</p>
+                <div className="bg-white rounded-lg border border-gray-300 overflow-hidden">
+                  {/* List Header */}
+                  <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                    <h4 className="font-semibold text-sm text-gray-900">{message.listMessage.header}</h4>
+                  </div>
+                  
+                  {/* List Sections */}
+                  <div className="max-h-64 overflow-y-auto">
+                    {message.listMessage.sections.map((section: any, sectionIndex: number) => (
+                      <div key={sectionIndex} className="border-b border-gray-100 last:border-b-0">
+                        <div className="bg-gray-50 px-3 py-1 border-b border-gray-200">
+                          <h5 className="font-medium text-xs text-gray-800">{section.title}</h5>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {section.rows.map((row: any, rowIndex: number) => (
+                            <button
+                              key={rowIndex}
+                              className="w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex items-center">
+                                <span className="text-gray-400 mr-2 text-xs">•</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 truncate">{row.title}</p>
+                                  {row.description && (
+                                    <p className="text-xs text-gray-500 truncate">{row.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     ))}
+                  </div>
+                  
+                  {/* List Footer */}
+                  {message.listMessage.footer && (
+                    <div className="bg-gray-50 px-3 py-2 border-t border-gray-200">
+                      <p className="text-xs text-gray-600">{message.listMessage.footer}</p>
+                    </div>
+                  )}
+                  
+                  {/* List Button */}
+                  <div className="bg-green-500 text-center">
+                    <button className="w-full py-2 text-white text-sm font-medium hover:bg-green-600 transition-colors">
+                      {message.listMessage.buttonText}
+                    </button>
                   </div>
                 </div>
               </div>

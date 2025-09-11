@@ -32,8 +32,8 @@ export default function DynamicSMSDemo() {
     });
     const [configPanelOpen, setConfigPanelOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<string>('all');
-    const [selectedChannel, setSelectedChannel] = useState<'sms' | 'rcs' | 'whatsapp'>('sms');
-    const [selectedContentType, setSelectedContentType] = useState<'text' | 'media' | 'card' | 'quickReplies' | 'carousel'>('text');
+    const [selectedChannel, setSelectedChannel] = useState<'sms' | 'rcs' | 'whatsapp'>(config.features.defaultChannel);
+    const [selectedContentType, setSelectedContentType] = useState<'text' | 'media' | 'richCard' | 'carousel' | 'listMessage'>('text');
 
     // Fetch Twilio status on component mount
     useEffect(() => {
@@ -89,7 +89,7 @@ export default function DynamicSMSDemo() {
             type.available.includes(channel)
         );
         if (availableTypes.length > 0) {
-            setSelectedContentType(availableTypes[0].id as 'text' | 'media' | 'card' | 'quickReplies' | 'carousel');
+            setSelectedContentType(availableTypes[0].id as 'text' | 'media' | 'richCard' | 'carousel' | 'listMessage');
         }
         
         switchVirtualPhoneApp(channel);
@@ -103,10 +103,22 @@ export default function DynamicSMSDemo() {
 
     // Get available content types for the selected channel
     const getAvailableContentTypes = () => {
-        const types = config.richMessageTypes;
-        return Object.values(types).filter(type => 
-            type.available.includes(selectedChannel)
-        );
+        if (!config.features.enableContentTypes) return [];
+        
+        // Use config-defined available content types, filtered by enabled templates and channel availability
+        return config.features.availableContentTypes
+            .filter(contentType => {
+                const template = config.contentTypeTemplates[contentType];
+                if (!template || !template.enabled) return false;
+                
+                const richType = config.richMessageTypes[contentType];
+                return richType && richType.available.includes(selectedChannel);
+            })
+            .map(contentType => ({
+                id: contentType,
+                ...config.contentTypeTemplates[contentType],
+                ...config.richMessageTypes[contentType]
+            }));
     };
 
     // Helper function to call SMS API
@@ -167,7 +179,8 @@ export default function DynamicSMSDemo() {
                 const enhancedTemplate = {
                     ...template,
                     selectedContentType,
-                    richMessageConfig: config.richMessageTypes[selectedContentType]
+                    richMessageConfig: config.richMessageTypes[selectedContentType],
+                    contentTypeConfig: template.contentTypeConfig
                 };
                 window.virtualPhoneReceiveMessage!(processedMessage, template.id, selectedChannel, enhancedTemplate);
                 addResult(`📱 Message delivered to virtual phone (${selectedChannel.toUpperCase()} - ${config.richMessageTypes[selectedContentType]?.name || 'Text'})`);
@@ -291,29 +304,31 @@ export default function DynamicSMSDemo() {
                 </div>
 
                 {/* Journey Steps Overview */}
-                <div className="mb-8 bg-white rounded-lg shadow-lg p-6">
-                    <h3 className="buffalo-title text-xl mb-4" style={{ color: config.brandColors.secondary }}>
-                        {config.uiText.sections.customerJourney}
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        {config.journeySteps.map((step) => (
-                            <div key={step.id} className="text-center">
-                                <div 
-                                    className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2"
-                                    style={{ backgroundColor: config.brandColors.primary, color: 'white' }}
-                                >
-                                    <span className="text-xl">{step.icon}</span>
+                {config.features.enableJourneyFlow && (
+                    <div className="mb-8 bg-white rounded-lg shadow-lg p-6">
+                        <h3 className="buffalo-title text-xl mb-4" style={{ color: config.brandColors.secondary }}>
+                            {config.uiText.sections.customerJourney}
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            {config.journeySteps.map((step) => (
+                                <div key={step.id} className="text-center">
+                                    <div 
+                                        className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2"
+                                        style={{ backgroundColor: config.brandColors.primary, color: 'white' }}
+                                    >
+                                        <span className="text-xl">{step.icon}</span>
+                                    </div>
+                                    <h4 className="twilio-text font-semibold text-sm" style={{ color: config.brandColors.secondary }}>
+                                        {step.title}
+                                    </h4>
+                                    <p className="twilio-text text-xs" style={{ color: config.brandColors.text }}>
+                                        {step.description}
+                                    </p>
                                 </div>
-                                <h4 className="twilio-text font-semibold text-sm" style={{ color: config.brandColors.secondary }}>
-                                    {step.title}
-                                </h4>
-                                <p className="twilio-text text-xs" style={{ color: config.brandColors.text }}>
-                                    {step.description}
-                                </p>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
                     {/* Left Column - Controls */}
@@ -341,33 +356,35 @@ export default function DynamicSMSDemo() {
                             </p>
                         </div>
 
-                        <div className="bg-white rounded-lg shadow-lg p-6">
-                            <h2 className="buffalo-title text-xl mb-4" style={{ color: config.brandColors.secondary }}>
-                                MESSAGING CHANNEL
-                            </h2>
-                            <div className="space-y-3">
-                                {(['sms', 'rcs', 'whatsapp'] as const).map((channel) => (
-                                    <button
-                                        key={channel}
-                                        onClick={() => handleChannelChange(channel)}
-                                        className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 border-2 ${
-                                            selectedChannel === channel
-                                                ? 'text-white'
-                                                : 'hover:border-opacity-60'
-                                        }`}
-                                        style={{
-                                            backgroundColor: selectedChannel === channel ? config.brandColors.primary : 'transparent',
-                                            borderColor: config.brandColors.primary,
-                                            color: selectedChannel === channel ? 'white' : config.brandColors.primary
-                                        }}
-                                    >
-                                        {channel === 'sms' && '📱 SMS'}
-                                        {channel === 'rcs' && '💬 RCS'}
-                                        {channel === 'whatsapp' && '🟢 WhatsApp'}
-                                    </button>
-                                ))}
+                        {config.features.enableChannelSelection && (
+                            <div className="bg-white rounded-lg shadow-lg p-6">
+                                <h2 className="buffalo-title text-xl mb-4" style={{ color: config.brandColors.secondary }}>
+                                    MESSAGING CHANNEL
+                                </h2>
+                                <div className="space-y-3">
+                                    {config.features.availableChannels.map((channel) => (
+                                        <button
+                                            key={channel}
+                                            onClick={() => handleChannelChange(channel)}
+                                            className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 border-2 ${
+                                                selectedChannel === channel
+                                                    ? 'text-white'
+                                                    : 'hover:border-opacity-60'
+                                            }`}
+                                            style={{
+                                                backgroundColor: selectedChannel === channel ? config.brandColors.primary : 'transparent',
+                                                borderColor: config.brandColors.primary,
+                                                color: selectedChannel === channel ? 'white' : config.brandColors.primary
+                                            }}
+                                        >
+                                            {channel === 'sms' && '📱 SMS'}
+                                            {channel === 'rcs' && '💬 RCS'}
+                                            {channel === 'whatsapp' && '🟢 WhatsApp'}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Content Type Selector - Only show for RCS/WhatsApp */}
                         {(selectedChannel === 'rcs' || selectedChannel === 'whatsapp') && (
@@ -379,7 +396,7 @@ export default function DynamicSMSDemo() {
                                     {getAvailableContentTypes().map((contentType) => (
                                         <button
                                             key={contentType.id}
-                                            onClick={() => setSelectedContentType(contentType.id as 'text' | 'media' | 'card' | 'quickReplies' | 'carousel')}
+                                            onClick={() => setSelectedContentType(contentType.id as 'text' | 'media' | 'richCard' | 'carousel' | 'listMessage')}
                                             className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 border text-left ${
                                                 selectedContentType === contentType.id
                                                     ? 'text-white border-transparent'
@@ -434,36 +451,38 @@ export default function DynamicSMSDemo() {
                     {/* Middle Column - Message Templates */}
                     <div className="xl:col-span-2 space-y-6">
                         {/* Category Filter */}
-                        <div className="bg-white rounded-lg shadow-lg p-4">
-                            <div className="flex flex-wrap gap-2">
-                                {categories.map((category) => {
-                                    const categoryColor = getCategoryColor(category);
-                                    return (
-                                        <button
-                                            key={category}
-                                            onClick={() => setActiveCategory(category)}
-                                            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors capitalize ${
-                                                activeCategory === category
-                                                    ? 'text-white'
-                                                    : 'hover:text-gray-800'
-                                            }`}
-                                            style={{
-                                                backgroundColor: activeCategory === category 
-                                                    ? categoryColor 
-                                                    : 'transparent',
-                                                border: `1px solid ${categoryColor}`,
-                                                color: activeCategory === category ? 'white' : categoryColor
-                                            }}
-                                        >
-                                            {category}
-                                        </button>
-                                    );
-                                })}
+                        {config.layout.showCategoryFilter && (
+                            <div className="bg-white rounded-lg shadow-lg p-4">
+                                <div className="flex flex-wrap gap-2">
+                                    {categories.map((category) => {
+                                        const categoryColor = getCategoryColor(category);
+                                        return (
+                                            <button
+                                                key={category}
+                                                onClick={() => setActiveCategory(category)}
+                                                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors capitalize ${
+                                                    activeCategory === category
+                                                        ? 'text-white'
+                                                        : 'hover:text-gray-800'
+                                                }`}
+                                                style={{
+                                                    backgroundColor: activeCategory === category 
+                                                        ? categoryColor 
+                                                        : 'transparent',
+                                                    border: `1px solid ${categoryColor}`,
+                                                    color: activeCategory === category ? 'white' : categoryColor
+                                                }}
+                                            >
+                                                {category}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Message Templates Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-fr">
+                        <div className={`grid grid-cols-1 ${config.layout.gridColumns === 1 ? '' : 'md:grid-cols-' + config.layout.gridColumns} gap-4 auto-rows-fr`}>
                             {getFilteredTemplates().map((template) => (
                                 <div key={template.id}>
                                     <DynamicMessageCard
@@ -473,7 +492,9 @@ export default function DynamicSMSDemo() {
                                         isLoading={isRunning}
                                         disabled={false}
                                         brandColors={config.brandColors}
+                                        cardLayout={config.cardLayouts.default}
                                         selectedChannel={selectedChannel}
+                                        selectedContentType={selectedContentType}
                                         uiText={{
                                             buttons: config.uiText.buttons,
                                             forms: config.uiText.forms
@@ -487,19 +508,21 @@ export default function DynamicSMSDemo() {
                     {/* Right Column - Virtual Phone & Results */}
                     <div className="space-y-6">
                         {/* Virtual Phone */}
-                        <div className="bg-white rounded-lg shadow-lg p-6">
-                            <h2 className="buffalo-title text-xl mb-4 text-center" style={{ color: config.brandColors.secondary }}>
-                                {config.uiText.sections.virtualPhone}
-                            </h2>
-                            <div className="flex justify-center">
-                                <VirtualPhone 
-                                    config={config}
-                                    onMessageReceived={(message) => {
-                                        addResult(`📱 Virtual phone received: "${message.content}"`);
-                                    }}
-                                />
+                        {config.features.enableVirtualPhone && (
+                            <div className="bg-white rounded-lg shadow-lg p-6">
+                                <h2 className="buffalo-title text-xl mb-4 text-center" style={{ color: config.brandColors.secondary }}>
+                                    {config.uiText.sections.virtualPhone}
+                                </h2>
+                                <div className="flex justify-center">
+                                    <VirtualPhone 
+                                        config={config}
+                                        onMessageReceived={(message) => {
+                                            addResult(`📱 Virtual phone received: "${message.content}"`);
+                                        }}
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Results Log */}
                         <div className="bg-white rounded-lg shadow-lg p-6">
@@ -546,12 +569,14 @@ export default function DynamicSMSDemo() {
             </div>
 
             {/* Configuration Panel */}
-            <ConfigPanel
-                config={config}
-                onConfigChange={setConfig}
-                isOpen={configPanelOpen}
-                onToggle={() => setConfigPanelOpen(!configPanelOpen)}
-            />
+            {config.features.enableConfigPanel && (
+                <ConfigPanel
+                    config={config}
+                    onConfigChange={setConfig}
+                    isOpen={configPanelOpen}
+                    onToggle={() => setConfigPanelOpen(!configPanelOpen)}
+                />
+            )}
         </div>
     );
 }

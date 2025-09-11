@@ -62,6 +62,80 @@ export interface DemoConfig {
     text: string;
   };
   
+  // Feature Configuration
+  features: {
+    enableRichMessaging: boolean;
+    enableVirtualPhone: boolean;
+    enableConfigPanel: boolean;
+    enableJourneyFlow: boolean;
+    enableChannelSelection: boolean;
+    availableChannels: ('sms' | 'rcs' | 'whatsapp')[];
+    defaultChannel: 'sms' | 'rcs' | 'whatsapp';
+    enableContentTypes: boolean;
+    availableContentTypes: ('text' | 'media' | 'richCard' | 'carousel' | 'listMessage')[];
+  };
+  
+  // Layout Configuration
+  layout: {
+    gridColumns: number;
+    showCategoryFilter: boolean;
+    showTimestamps: boolean;
+    showDeliveryStatus: boolean;
+    compactMode: boolean;
+    showPreviewSection: boolean;
+  };
+  
+  // Card Layout Templates
+  cardLayouts: {
+    default: {
+      showEmoji: boolean;
+      showCategory: boolean;
+      showChannel: boolean;
+      showDescription: boolean;
+      headerLayout: 'horizontal' | 'vertical';
+      buttonStyle: 'filled' | 'outlined' | 'text';
+      borderStyle: 'left' | 'top' | 'full' | 'none';
+    };
+    compact: {
+      showEmoji: boolean;
+      showCategory: boolean;
+      showChannel: boolean;
+      showDescription: boolean;
+      headerLayout: 'horizontal' | 'vertical';
+      buttonStyle: 'filled' | 'outlined' | 'text';
+      borderStyle: 'left' | 'top' | 'full' | 'none';
+    };
+    detailed: {
+      showEmoji: boolean;
+      showCategory: boolean;
+      showChannel: boolean;
+      showDescription: boolean;
+      headerLayout: 'horizontal' | 'vertical';
+      buttonStyle: 'filled' | 'outlined' | 'text';
+      borderStyle: 'left' | 'top' | 'full' | 'none';
+    };
+  };
+  
+  // Content Type Templates
+  contentTypeTemplates: {
+    [key: string]: {
+      name: string;
+      description: string;
+      icon: string;
+      enabled: boolean;
+      defaultValues: Record<string, string | number | boolean>;
+      customFields?: Array<{
+        name: string;
+        type: 'text' | 'textarea' | 'url' | 'number' | 'select' | 'boolean';
+        label: string;
+        placeholder?: string;
+        options?: string[];
+        defaultValue?: string | number | boolean;
+        required?: boolean;
+      }>;
+    };
+  };
+  
   // UI Text Configuration
   uiText: {
     // Main page sections
@@ -186,6 +260,9 @@ export interface DemoConfig {
       description: string;
       icon: string;
       available: ('sms' | 'rcs' | 'whatsapp')[];
+      customizable: {
+        variables: boolean;
+      };
     };
     media: {
       id: string;
@@ -193,27 +270,35 @@ export interface DemoConfig {
       description: string;
       icon: string;
       available: ('sms' | 'rcs' | 'whatsapp')[];
+      customizable: {
+        variables: boolean;
+        mediaUrl: boolean;
+        mediaType: boolean;
+        caption: boolean;
+      };
       mediaUrl?: string;
       mediaType?: 'image' | 'video' | 'audio' | 'document';
+      caption?: string;
     };
-    card: {
+    richCard: {
       id: string;
       name: string;
       description: string;
       icon: string;
       available: ('sms' | 'rcs' | 'whatsapp')[];
+      customizable: {
+        variables: boolean;
+        cardTitle: boolean;
+        cardSubtitle: boolean;
+        cardImage: boolean;
+        buttons: boolean;
+        quickReplies: boolean;
+      };
       cardTitle?: string;
       cardSubtitle?: string;
       cardImage?: string;
-      buttons?: Array<{ title: string; type: 'url' | 'action' }>;
-    };
-    quickReplies: {
-      id: string;
-      name: string;
-      description: string;
-      icon: string;
-      available: ('sms' | 'rcs' | 'whatsapp')[];
-      replies?: Array<{ id: string; title: string }>;
+      buttons?: Array<{ title: string; type: 'url' | 'phone' | 'reply'; payload?: string; url?: string }>;
+      quickReplies?: Array<{ title: string; payload?: string }>;
     };
     carousel: {
       id: string;
@@ -221,13 +306,39 @@ export interface DemoConfig {
       description: string;
       icon: string;
       available: ('sms' | 'rcs' | 'whatsapp')[];
+      customizable: {
+        variables: boolean;
+        items: boolean;
+        cardCount: boolean;
+      };
+      maxCards?: number;
       items?: Array<{
         id: string;
-        image: string;
         title: string;
-        subtitle: string;
-        price?: string;
-        buttons: Array<{ title: string; type: 'url' | 'action' }>;
+        subtitle?: string;
+        image?: string;
+        buttons?: Array<{ title: string; type: 'url' | 'phone' | 'reply'; payload?: string; url?: string }>;
+      }>;
+    };
+    listMessage: {
+      id: string;
+      name: string;
+      description: string;
+      icon: string;
+      available: ('sms' | 'rcs' | 'whatsapp')[];
+      customizable: {
+        variables: boolean;
+        header: boolean;
+        footer: boolean;
+        sections: boolean;
+        buttonText: boolean;
+      };
+      header?: string;
+      footer?: string;
+      buttonText?: string;
+      sections?: Array<{
+        title: string;
+        rows: Array<{ id: string; title: string; description?: string }>;
       }>;
     };
   };
@@ -252,6 +363,136 @@ export const defaultDemoConfig: DemoConfig = {
     accent: "#081F47",
     background: "#DDE0E6",
     text: "#4D5777"
+  },
+  
+  // Feature Configuration
+  features: {
+    enableRichMessaging: true,
+    enableVirtualPhone: true,
+    enableConfigPanel: true,
+    enableJourneyFlow: true,
+    enableChannelSelection: true,
+    availableChannels: ['sms', 'rcs', 'whatsapp'],
+    defaultChannel: 'sms',
+    enableContentTypes: true,
+    availableContentTypes: ['text', 'media', 'richCard', 'carousel', 'listMessage']
+  },
+  
+  // Layout Configuration
+  layout: {
+    gridColumns: 2,
+    showCategoryFilter: true,
+    showTimestamps: true,
+    showDeliveryStatus: true,
+    compactMode: false,
+    showPreviewSection: true
+  },
+  
+  // Card Layout Templates
+  cardLayouts: {
+    default: {
+      showEmoji: true,
+      showCategory: true,
+      showChannel: true,
+      showDescription: true,
+      headerLayout: 'horizontal',
+      buttonStyle: 'filled',
+      borderStyle: 'left'
+    },
+    compact: {
+      showEmoji: true,
+      showCategory: false,
+      showChannel: false,
+      showDescription: false,
+      headerLayout: 'horizontal',
+      buttonStyle: 'filled',
+      borderStyle: 'none'
+    },
+    detailed: {
+      showEmoji: true,
+      showCategory: true,
+      showChannel: true,
+      showDescription: true,
+      headerLayout: 'vertical',
+      buttonStyle: 'outlined',
+      borderStyle: 'full'
+    }
+  },
+  
+  // Content Type Templates
+  contentTypeTemplates: {
+    text: {
+      name: "Text Message",
+      description: "Simple text with variables",
+      icon: "💬",
+      enabled: true,
+      defaultValues: {},
+      customFields: []
+    },
+    media: {
+      name: "Media Message",
+      description: "Image, video, audio or document",
+      icon: "📷",
+      enabled: true,
+      defaultValues: {
+        mediaUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400",
+        mediaType: "image",
+        caption: "Check out our latest products!"
+      },
+      customFields: [
+        { name: "mediaUrl", type: "url", label: "Media URL", placeholder: "https://example.com/image.jpg", required: true },
+        { name: "mediaType", type: "select", label: "Media Type", options: ["image", "video", "audio", "document"], defaultValue: "image" },
+        { name: "caption", type: "textarea", label: "Caption", placeholder: "Optional caption text" }
+      ]
+    },
+    richCard: {
+      name: "Rich Card",
+      description: "Interactive card with buttons",
+      icon: "🃏",
+      enabled: true,
+      defaultValues: {
+        cardTitle: "Special Offer!",
+        cardSubtitle: "Limited time deal - Don't miss out!",
+        cardBody: "Get exclusive access to premium items with amazing discounts.",
+        cardImage: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400",
+        interactiveType: "buttons"
+      },
+      customFields: [
+        { name: "cardTitle", type: "text", label: "Card Title", placeholder: "Card title", required: true },
+        { name: "cardSubtitle", type: "text", label: "Card Subtitle", placeholder: "Card subtitle" },
+        { name: "cardBody", type: "textarea", label: "Card Body", placeholder: "Optional body text" },
+        { name: "cardImage", type: "url", label: "Card Image URL", placeholder: "https://example.com/card-image.jpg" },
+        { name: "interactiveType", type: "select", label: "Interactive Type", options: ["buttons", "quickReplies"], defaultValue: "buttons" }
+      ]
+    },
+    carousel: {
+      name: "Carousel Cards",
+      description: "Multiple scrollable cards",
+      icon: "🎠",
+      enabled: true,
+      defaultValues: {
+        carouselBody: "Browse our featured collection of developer merchandise."
+      },
+      customFields: [
+        { name: "carouselBody", type: "textarea", label: "Carousel Body", placeholder: "Optional introduction text" }
+      ]
+    },
+    listMessage: {
+      name: "List Message",
+      description: "Selectable list with sections",
+      icon: "📋",
+      enabled: true,
+      defaultValues: {
+        listHeader: "Choose Your Product Category",
+        listFooter: "Select an option to continue",
+        buttonText: "View Products"
+      },
+      customFields: [
+        { name: "listHeader", type: "text", label: "List Header", placeholder: "Choose an option", required: true },
+        { name: "listFooter", type: "text", label: "List Footer", placeholder: "Optional footer text" },
+        { name: "buttonText", type: "text", label: "Button Text", placeholder: "View Options", required: true }
+      ]
+    }
   },
   
   uiText: {
@@ -554,75 +795,132 @@ export const defaultDemoConfig: DemoConfig = {
     text: {
       id: "text",
       name: "Text Message",
-      description: "Simple text-only message",
+      description: "Simple text message with variables",
       icon: "💬",
-      available: ["sms", "rcs", "whatsapp"]
+      available: ["sms", "rcs", "whatsapp"],
+      customizable: {
+        variables: true
+      }
     },
     media: {
       id: "media",
-      name: "Media Message",
-      description: "Message with image, video, or document",
+      name: "Media Message (MMS)",
+      description: "Message with image, video, audio, or document",
       icon: "📷",
       available: ["rcs", "whatsapp"],
+      customizable: {
+        variables: true,
+        mediaUrl: true,
+        mediaType: true,
+        caption: true
+      },
       mediaUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400",
-      mediaType: "image"
+      mediaType: "image",
+      caption: "Check out our latest products!"
     },
-    card: {
-      id: "card",
-      name: "Card Message",
-      description: "Rich card with image, title, and buttons",
+    richCard: {
+      id: "richCard",
+      name: "Rich Card",
+      description: "Interactive card with image, text, and action buttons",
       icon: "🃏",
       available: ["rcs", "whatsapp"],
+      customizable: {
+        variables: true,
+        cardTitle: true,
+        cardSubtitle: true,
+        cardImage: true,
+        buttons: true,
+        quickReplies: true
+      },
       cardTitle: "Special Offer!",
       cardSubtitle: "Limited time deal - Don't miss out!",
-      cardImage: "🎉",
+      cardImage: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400",
       buttons: [
-        { title: "Shop Now", type: "url" },
-        { title: "Learn More", type: "action" }
-      ]
-    },
-    quickReplies: {
-      id: "quickReplies",
-      name: "Quick Replies",
-      description: "Message with suggested reply buttons",
-      icon: "⚡",
-      available: ["rcs", "whatsapp"],
-      replies: [
-        { id: "1", title: "🛍️ Shop Now" },
-        { id: "2", title: "📞 Call Us" },
-        { id: "3", title: "💬 Chat" }
+        { title: "Shop Now", type: "url", url: "https://owlshop.com" },
+        { title: "Call Us", type: "phone", payload: "+1-833-365-9260" },
+        { title: "More Info", type: "reply", payload: "more_info" }
+      ],
+      quickReplies: [
+        { title: "Yes, I'm interested", payload: "interested" },
+        { title: "Not now", payload: "not_now" },
+        { title: "Tell me more", payload: "more_info" }
       ]
     },
     carousel: {
       id: "carousel",
-      name: "Product Carousel",
-      description: "Multiple cards with products or options",
+      name: "Carousel Cards",
+      description: "Multiple scrollable rich cards",
       icon: "🎠",
       available: ["rcs", "whatsapp"],
+      customizable: {
+        variables: true,
+        items: true,
+        cardCount: true
+      },
+      maxCards: 10,
       items: [
         {
           id: "1",
-          image: "🦉",
           title: "Owl Hoodie",
           subtitle: "Premium comfort hoodie",
-          price: "$49.99",
-          buttons: [{ title: "Buy Now", type: "url" }]
+          image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200",
+          buttons: [
+            { title: "Buy $49.99", type: "url", url: "https://owlshop.com/hoodie" },
+            { title: "Details", type: "reply", payload: "hoodie_details" }
+          ]
         },
         {
           id: "2",
-          image: "👔",
           title: "Dev T-Shirt",
-          subtitle: "Perfect for coding",
-          price: "$29.99",
-          buttons: [{ title: "Buy Now", type: "url" }]
+          subtitle: "Perfect for coding sessions",
+          image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200",
+          buttons: [
+            { title: "Buy $29.99", type: "url", url: "https://owlshop.com/tshirt" },
+            { title: "Details", type: "reply", payload: "tshirt_details" }
+          ]
         },
         {
           id: "3",
-          image: "☕",
           title: "Code Mug",
-          subtitle: "Fuel your coding",
-          price: "$19.99",
-          buttons: [{ title: "Buy Now", type: "url" }]
+          subtitle: "Fuel your coding with coffee",
+          image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200",
+          buttons: [
+            { title: "Buy $19.99", type: "url", url: "https://owlshop.com/mug" },
+            { title: "Details", type: "reply", payload: "mug_details" }
+          ]
+        }
+      ]
+    },
+    listMessage: {
+      id: "listMessage",
+      name: "List Message",
+      description: "Interactive list with selectable options",
+      icon: "📋",
+      available: ["whatsapp"],
+      customizable: {
+        variables: true,
+        header: true,
+        footer: true,
+        sections: true,
+        buttonText: true
+      },
+      header: "Choose Your Product Category",
+      footer: "Select an option to continue",
+      buttonText: "View Products",
+      sections: [
+        {
+          title: "Clothing",
+          rows: [
+            { id: "hoodies", title: "Hoodies", description: "Comfortable and stylish hoodies" },
+            { id: "tshirts", title: "T-Shirts", description: "Perfect for everyday wear" }
+          ]
+        },
+        {
+          title: "Accessories",
+          rows: [
+            { id: "mugs", title: "Mugs", description: "Coffee mugs for developers" },
+            { id: "stickers", title: "Stickers", description: "Laptop stickers and decals" }
+          ]
         }
       ]
     }
