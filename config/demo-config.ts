@@ -11,6 +11,26 @@ export interface MessageTemplate {
   variables?: Record<string, string | number>;
   apiAction: string;
   buttonText: string;
+  selectedContentType?: 'text' | 'media' | 'richCard' | 'carousel' | 'listMessage';
+  richMessageConfig?: Record<string, unknown>;
+  contentTypeConfig?: {
+    interactiveType?: 'buttons' | 'quickReplies';
+    cardImage?: string;
+    cardTitle?: string;
+    cardSubtitle?: string;
+    cardBody?: string;
+    buttons?: Array<{ title: string; type: string; payload?: string }>;
+    quickReplies?: Array<{ title: string; payload?: string }>;
+    carouselItems?: Array<{ id: string; image: string; title: string; subtitle: string; buttons: Array<{ title: string; type: string }> }>;
+    carouselBody?: string;
+    mediaUrl?: string;
+    mediaType?: 'image' | 'video' | 'audio' | 'document';
+    caption?: string;
+    listHeader?: string;
+    listFooter?: string;
+    buttonText?: string;
+    listSections?: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>;
+  };
 }
 
 export interface PhoneAppConfig {

@@ -1170,22 +1170,7 @@ export default function DynamicMessageCard({
           </div>
         ) : (
           <button
-            onClick={() => onSend({ 
-              ...template, 
-              contentTypeConfig: selectedContentType !== 'text' ? {
-                ...contentTypeConfig,
-                buttons: cardButtons.filter(b => b.title.trim()),
-                quickReplies: cardQuickReplies.filter(q => q.title.trim()),
-                carouselItems: carouselItems.filter(item => item.title.trim()).map(item => ({
-                  ...item,
-                  buttons: item.buttons.filter(b => b.title.trim())
-                })),
-                listSections: listSections.filter(section => section.title.trim()).map(section => ({
-                  ...section,
-                  rows: section.rows.filter(row => row.title.trim())
-                }))
-              } : undefined 
-            })}
+            onClick={() => onSend(template)}
             disabled={disabled || isLoading}
             className="w-full py-2 rounded-lg font-medium text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
             style={{ 

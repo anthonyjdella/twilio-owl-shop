@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { DemoConfig, getMessageTheme } from "@/config/demo-config";
+import { DemoConfig, getMessageTheme, MessageTemplate } from "@/config/demo-config";
 
 // Extend Window interface to include our custom property
 declare global {
   interface Window {
-    virtualPhoneReceiveMessage?: (content: string, messageId?: string, channel?: 'sms' | 'rcs' | 'whatsapp', template?: any) => void;
+    virtualPhoneReceiveMessage?: (content: string, messageId?: string, channel?: 'sms' | 'rcs' | 'whatsapp', template?: MessageTemplate) => void;
     virtualPhoneSwitchApp?: (channel: 'sms' | 'rcs' | 'whatsapp') => void;
   }
 }
@@ -20,7 +20,7 @@ interface Message {
   read: boolean;
   channel?: 'sms' | 'rcs' | 'whatsapp';
   type?: 'text' | 'quick_replies' | 'carousel' | 'card' | 'media' | 'listMessage';
-  template?: any;
+  template?: MessageTemplate;
   quickReplies?: Array<{ id: string; title: string }>;
   carousel?: Array<{ id: string; image: string; title: string; subtitle: string; buttons: Array<{ title: string; type: string }> }>;
   card?: { image: string; title: string; subtitle: string; body?: string; buttons?: Array<{ title: string; type: string; url?: string; payload?: string }>; quickReplies?: Array<{ title: string; payload?: string }> };
@@ -41,7 +41,6 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   const [currentTime, setCurrentTime] = useState(config.virtualPhone.currentTime);
   const [showContactProfile, setShowContactProfile] = useState(false);
   const [whatsAppView, setWhatsAppView] = useState<'chats' | 'chat' | 'profile'>('chats');
-  const [selectedChat, setSelectedChat] = useState<string>('business');
 
   // Update time every minute
   useEffect(() => {
@@ -57,7 +56,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   }, []);
 
   // Function to receive a new message from the demo
-  const receiveMessage = useCallback((content: string, messageId?: string, channel: 'sms' | 'rcs' | 'whatsapp' = 'sms', template?: any) => {
+  const receiveMessage = useCallback((content: string, messageId?: string, channel: 'sms' | 'rcs' | 'whatsapp' = 'sms', template?: MessageTemplate) => {
     // Create rich message based on template and channel
     const newMessage: Message = {
       id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -72,9 +71,6 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     // Add rich content for RCS and WhatsApp channels based on selected content type
     if (channel === 'rcs' || channel === 'whatsapp') {
       if (template && template.selectedContentType && template.richMessageConfig) {
-        // Use the user-selected content type
-        newMessage.type = template.selectedContentType;
-        
         // Configure rich content based on the selected type
         switch (template.selectedContentType) {
           case 'richCard':
@@ -82,28 +78,28 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             // Determine which interactive type to use - either buttons OR quick replies
             const useButtons = template.contentTypeConfig?.interactiveType !== 'quickReplies';
             newMessage.card = {
-              image: template.contentTypeConfig?.cardImage || template.richMessageConfig.cardImage || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
-              title: template.contentTypeConfig?.cardTitle || template.richMessageConfig.cardTitle || 'Special Offer!',
-              subtitle: template.contentTypeConfig?.cardSubtitle || template.richMessageConfig.cardSubtitle || 'Limited time deal - Don\'t miss out!',
-              body: template.contentTypeConfig?.cardBody || template.richMessageConfig.cardBody,
+              image: template.contentTypeConfig?.cardImage || (template.richMessageConfig.cardImage as string) || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
+              title: template.contentTypeConfig?.cardTitle || (template.richMessageConfig.cardTitle as string) || 'Special Offer!',
+              subtitle: template.contentTypeConfig?.cardSubtitle || (template.richMessageConfig.cardSubtitle as string) || 'Limited time deal - Don\'t miss out!',
+              body: template.contentTypeConfig?.cardBody || (template.richMessageConfig.cardBody as string),
               buttons: useButtons ? (
-                template.contentTypeConfig?.buttons?.length > 0 
+                (template.contentTypeConfig?.buttons && template.contentTypeConfig.buttons.length > 0)
                   ? template.contentTypeConfig.buttons.map(b => ({ 
                       title: b.title, 
                       type: b.type, 
                       url: b.type === 'url' ? b.payload : undefined,
                       payload: b.type !== 'url' ? b.payload : undefined 
                     }))
-                  : template.richMessageConfig.buttons || [
+                  : (template.richMessageConfig.buttons as Array<{ title: string; type: string; url?: string; payload?: string }>) || [
                       { title: 'Shop Now', type: 'url', url: 'https://owlshop.com' },
                       { title: 'Call Us', type: 'phone', payload: '+1-833-365-9260' },
                       { title: 'More Info', type: 'reply', payload: 'more_info' }
                     ]
               ) : undefined,
               quickReplies: !useButtons ? (
-                template.contentTypeConfig?.quickReplies?.length > 0 
+                (template.contentTypeConfig?.quickReplies && template.contentTypeConfig.quickReplies.length > 0)
                   ? template.contentTypeConfig.quickReplies
-                  : template.richMessageConfig.quickReplies || [
+                  : (template.richMessageConfig.quickReplies as Array<{ title: string; payload?: string }>) || [
                       { title: 'Yes, I\'m interested', payload: 'interested' },
                       { title: 'Not now', payload: 'not_now' },
                       { title: 'Tell me more', payload: 'more_info' }
@@ -114,9 +110,9 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             
           case 'carousel':
             // Use user-defined carousel items if available, otherwise fallback to defaults
-            newMessage.carousel = template.contentTypeConfig?.carouselItems?.length > 0
+            newMessage.carousel = (template.contentTypeConfig?.carouselItems && template.contentTypeConfig.carouselItems.length > 0)
               ? template.contentTypeConfig.carouselItems
-              : template.richMessageConfig.items || [
+              : (template.richMessageConfig.items as Array<{ id: string; image: string; title: string; subtitle: string; buttons: Array<{ title: string; type: string }> }>) || [
                   {
                     id: '1',
                     image: '🦉',
@@ -145,9 +141,9 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             newMessage.type = 'media';
             if (template.contentTypeConfig) {
               newMessage.media = {
-                url: template.contentTypeConfig.mediaUrl || template.richMessageConfig.mediaUrl || '',
-                type: template.contentTypeConfig.mediaType || template.richMessageConfig.mediaType || 'image',
-                caption: template.contentTypeConfig.caption || template.richMessageConfig.caption || ''
+                url: template.contentTypeConfig.mediaUrl || (template.richMessageConfig.mediaUrl as string) || '',
+                type: template.contentTypeConfig.mediaType || (template.richMessageConfig.mediaType as 'image' | 'video' | 'audio' | 'document') || 'image',
+                caption: template.contentTypeConfig.caption || (template.richMessageConfig.caption as string) || ''
               };
             }
             break;
@@ -155,12 +151,12 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
           case 'listMessage':
             newMessage.type = 'listMessage';
             newMessage.listMessage = {
-              header: template.contentTypeConfig?.listHeader || template.richMessageConfig.header || 'Choose Your Product Category',
-              footer: template.contentTypeConfig?.listFooter || template.richMessageConfig.footer || 'Select an option to continue',
-              buttonText: template.contentTypeConfig?.buttonText || template.richMessageConfig.buttonText || 'View Products',
-              sections: template.contentTypeConfig?.listSections?.length > 0
+              header: template.contentTypeConfig?.listHeader || (template.richMessageConfig.header as string) || 'Choose Your Product Category',
+              footer: template.contentTypeConfig?.listFooter || (template.richMessageConfig.footer as string) || 'Select an option to continue',
+              buttonText: template.contentTypeConfig?.buttonText || (template.richMessageConfig.buttonText as string) || 'View Products',
+              sections: (template.contentTypeConfig?.listSections && template.contentTypeConfig.listSections.length > 0)
                 ? template.contentTypeConfig.listSections
-                : template.richMessageConfig.sections || [
+                : (template.richMessageConfig.sections as Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>) || [
                     {
                       title: "Clothing",
                       rows: [
@@ -464,44 +460,44 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                       {/* Media Message */}
                       {message.type === 'media' && message.media && (
                         <div className="bg-white rounded-lg p-2 shadow-sm border max-w-full">
-                          {message.media.caption && (
+                          {message.media?.caption && (
                             <p className="text-xs text-gray-900 mb-2 break-words">{message.content}</p>
                           )}
-                          {message.media.type === 'image' && message.media.url && (
+                          {message.media?.type === 'image' && message.media?.url && (
                             <div className="relative">
                               <img 
-                                src={message.media.url} 
+                                src={message.media?.url} 
                                 alt="Media content"
                                 className="max-w-full h-auto rounded border"
                                 style={{ maxHeight: '200px' }}
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none';
-                                  e.currentTarget.nextElementSibling!.style.display = 'block';
+                                  (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'block';
                                 }}
                               />
                               <div className="hidden bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
                                 🖼️ Image not available<br />
-                                <span className="text-xs break-all">{message.media.url}</span>
+                                <span className="text-xs break-all">{message.media?.url}</span>
                               </div>
                             </div>
                           )}
-                          {message.media.type === 'video' && message.media.url && (
+                          {message.media?.type === 'video' && message.media?.url && (
                             <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
-                              🎥 Video: {message.media.url}
+                              🎥 Video: {message.media?.url}
                             </div>
                           )}
-                          {message.media.type === 'audio' && message.media.url && (
+                          {message.media?.type === 'audio' && message.media?.url && (
                             <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
-                              🎵 Audio: {message.media.url}
+                              🎵 Audio: {message.media?.url}
                             </div>
                           )}
-                          {message.media.type === 'document' && message.media.url && (
+                          {message.media?.type === 'document' && message.media?.url && (
                             <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
-                              📄 Document: {message.media.url}
+                              📄 Document: {message.media?.url}
                             </div>
                           )}
-                          {message.media.caption && (
-                            <p className="text-xs text-gray-600 mt-2 break-words">{message.media.caption}</p>
+                          {message.media?.caption && (
+                            <p className="text-xs text-gray-600 mt-2 break-words">{message.media?.caption}</p>
                           )}
                         </div>
                       )}
@@ -511,7 +507,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                         <div className="bg-white rounded-lg p-2 shadow-sm border">
                           <p className="text-xs text-gray-900 mb-2 break-words">{message.content}</p>
                           <div className="flex flex-wrap gap-1">
-                            {message.quickReplies.map((reply) => (
+                            {message.quickReplies?.map((reply) => (
                               <button
                                 key={reply.id}
                                 className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs hover:bg-blue-200"
@@ -529,32 +525,32 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                           <p className="text-xs text-gray-900 mb-2 break-words">{message.content}</p>
                           <div className="bg-gray-50 rounded-lg p-3 border">
                             {/* Card Image */}
-                            {message.card.image && message.card.image.startsWith('http') ? (
+                            {message.card?.image && message.card?.image.startsWith('http') ? (
                               <div className="mb-2">
                                 <img 
-                                  src={message.card.image} 
+                                  src={message.card?.image} 
                                   alt="Card image"
                                   className="w-full h-32 object-cover rounded border"
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
-                                    e.currentTarget.nextElementSibling!.style.display = 'block';
+                                    (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'block';
                                   }}
                                 />
                                 <div className="hidden text-3xl text-center py-4">🖼️</div>
                               </div>
                             ) : (
-                              <div className="text-3xl text-center mb-2">{message.card.image || '🛒'}</div>
+                              <div className="text-3xl text-center mb-2">{message.card?.image || '🛒'}</div>
                             )}
-                            <h5 className="font-semibold text-sm mb-1">{message.card.title}</h5>
-                            <p className="text-xs text-gray-600 mb-2">{message.card.subtitle}</p>
-                            {message.card.body && (
-                              <p className="text-xs text-gray-700 mb-3 leading-relaxed">{message.card.body}</p>
+                            <h5 className="font-semibold text-sm mb-1">{message.card?.title}</h5>
+                            <p className="text-xs text-gray-600 mb-2">{message.card?.subtitle}</p>
+                            {message.card?.body && (
+                              <p className="text-xs text-gray-700 mb-3 leading-relaxed">{message.card?.body}</p>
                             )}
                             
                             {/* Action Buttons */}
-                            {message.card.buttons && message.card.buttons.length > 0 && (
+                            {message.card?.buttons && message.card?.buttons.length > 0 && (
                               <div className="flex space-x-1 mb-2">
-                                {message.card.buttons.map((button, idx) => (
+                                {message.card?.buttons.map((button, idx) => (
                                   <button
                                     key={idx}
                                     className={`flex-1 text-white text-xs py-2 rounded hover:opacity-80 ${
@@ -573,9 +569,9 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                             )}
                             
                             {/* Quick Replies */}
-                            {message.card.quickReplies && message.card.quickReplies.length > 0 && (
+                            {message.card?.quickReplies && message.card?.quickReplies.length > 0 && (
                               <div className="flex flex-wrap gap-1">
-                                {message.card.quickReplies.map((reply, idx) => (
+                                {message.card?.quickReplies.map((reply, idx) => (
                                   <button
                                     key={idx}
                                     className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200"
@@ -598,7 +594,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                             <p className="text-xs text-gray-700 mb-2 leading-relaxed italic">{message.template.contentTypeConfig.carouselBody}</p>
                           )}
                           <div className="flex space-x-1 overflow-x-auto pb-2 max-w-full">
-                            {message.carousel.map((item) => (
+                            {message.carousel?.map((item) => (
                               <div key={item.id} className="min-w-[120px] flex-shrink-0 bg-gray-50 rounded-lg p-2 border">
                                 {/* Carousel Item Image */}
                                 {item.image && item.image.startsWith('http') ? (
@@ -609,7 +605,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                                       className="w-full h-16 object-cover rounded border"
                                       onError={(e) => {
                                         e.currentTarget.style.display = 'none';
-                                        e.currentTarget.nextElementSibling!.style.display = 'block';
+                                        (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'block';
                                       }}
                                     />
                                     <div className="hidden text-lg text-center py-2">🖼️</div>
@@ -798,7 +794,6 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
           <button
             key={chat.id}
             onClick={() => {
-              setSelectedChat(chat.id);
               setWhatsAppView('chat');
             }}
             className="w-full p-3 border-b border-gray-100 hover:bg-gray-50 flex items-center space-x-3"
@@ -832,7 +827,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
       </div>
     );
 
-    const renderMessage = (message: any) => {
+    const renderMessage = (message: Message) => {
       const isUser = message.sender === 'user';
       
       return (
@@ -844,44 +839,44 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             
             {message.type === 'media' && message.media && (
               <div className="max-w-full">
-                {message.media.caption && (
+                {message.media?.caption && (
                   <p className="text-sm mb-2 break-words">{message.content}</p>
                 )}
-                {message.media.type === 'image' && message.media.url && (
+                {message.media?.type === 'image' && message.media?.url && (
                   <div className="relative">
                     <img 
-                      src={message.media.url} 
+                      src={message.media?.url} 
                       alt="Media content"
                       className="max-w-full h-auto rounded border"
                       style={{ maxHeight: '200px' }}
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
-                        e.currentTarget.nextElementSibling!.style.display = 'block';
+                        (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'block';
                       }}
                     />
                     <div className="hidden bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
                       🖼️ Image not available<br />
-                      <span className="text-xs break-all">{message.media.url}</span>
+                      <span className="text-xs break-all">{message.media?.url}</span>
                     </div>
                   </div>
                 )}
-                {message.media.type === 'video' && message.media.url && (
+                {message.media?.type === 'video' && message.media?.url && (
                   <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
-                    🎥 Video: {message.media.url}
+                    🎥 Video: {message.media?.url}
                   </div>
                 )}
-                {message.media.type === 'audio' && message.media.url && (
+                {message.media?.type === 'audio' && message.media?.url && (
                   <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
-                    🎵 Audio: {message.media.url}
+                    🎵 Audio: {message.media?.url}
                   </div>
                 )}
-                {message.media.type === 'document' && message.media.url && (
+                {message.media?.type === 'document' && message.media?.url && (
                   <div className="bg-gray-100 p-4 rounded text-center text-xs text-gray-600">
-                    📄 Document: {message.media.url}
+                    📄 Document: {message.media?.url}
                   </div>
                 )}
-                {message.media.caption && (
-                  <p className="text-sm text-gray-600 mt-2 break-words">{message.media.caption}</p>
+                {message.media?.caption && (
+                  <p className="text-sm text-gray-600 mt-2 break-words">{message.media?.caption}</p>
                 )}
               </div>
             )}
@@ -890,7 +885,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
               <div>
                 <p className="text-sm mb-2 break-words">{message.content}</p>
                 <div className="flex flex-wrap gap-1">
-                  {message.quickReplies.map((reply: any) => (
+                  {message.quickReplies?.map((reply: { id: string; title: string }) => (
                     <button
                       key={reply.id}
                       className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs hover:bg-green-200"
@@ -909,7 +904,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                   <p className="text-sm text-gray-700 mb-2 leading-relaxed italic">{message.template.contentTypeConfig.carouselBody}</p>
                 )}
                 <div className="flex space-x-1 overflow-x-auto pb-2 max-w-full">
-                  {message.carousel.map((item: any) => (
+                  {message.carousel?.map((item: { id: string; image: string; title: string; subtitle: string; buttons: Array<{ title: string; type: string }> }) => (
                     <div key={item.id} className="min-w-[120px] flex-shrink-0 bg-gray-50 rounded-lg p-2 border">
                       {/* Carousel Item Image */}
                       {item.image && item.image.startsWith('http') ? (
@@ -920,7 +915,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                             className="w-full h-16 object-cover rounded border"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
-                              e.currentTarget.nextElementSibling!.style.display = 'block';
+                              (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'block';
                             }}
                           />
                           <div className="hidden text-lg text-center py-2">🖼️</div>
@@ -930,7 +925,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                       )}
                       <h5 className="font-semibold text-xs mb-1 truncate">{item.title}</h5>
                       <p className="text-xs text-gray-600 mb-2 truncate">{item.subtitle}</p>
-                      {item.buttons.map((button: any, idx: number) => (
+                      {item.buttons.map((button: { title: string; type: string }, idx: number) => (
                         <button
                           key={idx}
                           className="w-full bg-green-500 text-white text-xs py-1 rounded hover:bg-green-600 mb-1"
@@ -949,32 +944,32 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                 <p className="text-sm mb-2 break-words">{message.content}</p>
                 <div className="bg-gray-50 rounded-lg p-3 border">
                   {/* Card Image */}
-                  {message.card.image && message.card.image.startsWith('http') ? (
+                  {message.card?.image && message.card?.image.startsWith('http') ? (
                     <div className="mb-2">
                       <img 
-                        src={message.card.image} 
+                        src={message.card?.image} 
                         alt="Card image"
                         className="w-full h-32 object-cover rounded border"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
-                          e.currentTarget.nextElementSibling!.style.display = 'block';
+                          (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'block';
                         }}
                       />
                       <div className="hidden text-3xl text-center py-4">🖼️</div>
                     </div>
                   ) : (
-                    <div className="text-3xl text-center mb-2">{message.card.image || '🛒'}</div>
+                    <div className="text-3xl text-center mb-2">{message.card?.image || '🛒'}</div>
                   )}
-                  <h5 className="font-semibold text-sm mb-1">{message.card.title}</h5>
-                  <p className="text-xs text-gray-600 mb-2">{message.card.subtitle}</p>
-                  {message.card.body && (
-                    <p className="text-xs text-gray-700 mb-3 leading-relaxed">{message.card.body}</p>
+                  <h5 className="font-semibold text-sm mb-1">{message.card?.title}</h5>
+                  <p className="text-xs text-gray-600 mb-2">{message.card?.subtitle}</p>
+                  {message.card?.body && (
+                    <p className="text-xs text-gray-700 mb-3 leading-relaxed">{message.card?.body}</p>
                   )}
                   
                   {/* Action Buttons */}
-                  {message.card.buttons && message.card.buttons.length > 0 && (
+                  {message.card?.buttons && message.card?.buttons.length > 0 && (
                     <div className="flex space-x-1 mb-2">
-                      {message.card.buttons.map((button: any, idx: number) => (
+                      {message.card?.buttons.map((button: { title: string; type: string; url?: string; payload?: string }, idx: number) => (
                         <button
                           key={idx}
                           className={`flex-1 text-white text-xs py-2 rounded hover:opacity-80 ${
@@ -993,9 +988,9 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                   )}
                   
                   {/* Quick Replies */}
-                  {message.card.quickReplies && message.card.quickReplies.length > 0 && (
+                  {message.card?.quickReplies && message.card?.quickReplies.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                      {message.card.quickReplies.map((reply: any, idx: number) => (
+                      {message.card?.quickReplies.map((reply: { title: string; payload?: string }, idx: number) => (
                         <button
                           key={idx}
                           className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded hover:bg-green-200"
@@ -1016,18 +1011,18 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                 <div className="bg-white rounded-lg border border-gray-300 overflow-hidden">
                   {/* List Header */}
                   <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
-                    <h4 className="font-semibold text-sm text-gray-900">{message.listMessage.header}</h4>
+                    <h4 className="font-semibold text-sm text-gray-900">{message.listMessage?.header}</h4>
                   </div>
                   
                   {/* List Sections */}
                   <div className="max-h-64 overflow-y-auto">
-                    {message.listMessage.sections.map((section: any, sectionIndex: number) => (
+                    {message.listMessage?.sections.map((section: { title: string; rows: Array<{ id: string; title: string; description?: string }> }, sectionIndex: number) => (
                       <div key={sectionIndex} className="border-b border-gray-100 last:border-b-0">
                         <div className="bg-gray-50 px-3 py-1 border-b border-gray-200">
                           <h5 className="font-medium text-xs text-gray-800">{section.title}</h5>
                         </div>
                         <div className="divide-y divide-gray-100">
-                          {section.rows.map((row: any, rowIndex: number) => (
+                          {section.rows.map((row: { id: string; title: string; description?: string }, rowIndex: number) => (
                             <button
                               key={rowIndex}
                               className="w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors"
@@ -1049,16 +1044,16 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                   </div>
                   
                   {/* List Footer */}
-                  {message.listMessage.footer && (
+                  {message.listMessage?.footer && (
                     <div className="bg-gray-50 px-3 py-2 border-t border-gray-200">
-                      <p className="text-xs text-gray-600">{message.listMessage.footer}</p>
+                      <p className="text-xs text-gray-600">{message.listMessage?.footer}</p>
                     </div>
                   )}
                   
                   {/* List Button */}
                   <div className="bg-green-500 text-center">
                     <button className="w-full py-2 text-white text-sm font-medium hover:bg-green-600 transition-colors">
-                      {message.listMessage.buttonText}
+                      {message.listMessage?.buttonText}
                     </button>
                   </div>
                 </div>

@@ -96,10 +96,6 @@ export default function DynamicSMSDemo() {
         addResult(`📱 Switched to ${channel.toUpperCase()} app`);
     };
 
-    // Check if phone number is required for the current channel
-    const isPhoneNumberRequired = () => {
-        return selectedChannel === 'sms'; // Only SMS requires phone number
-    };
 
     // Get available content types for the selected channel
     const getAvailableContentTypes = () => {
@@ -115,7 +111,6 @@ export default function DynamicSMSDemo() {
                 return richType && richType.available.includes(selectedChannel);
             })
             .map(contentType => ({
-                id: contentType,
                 ...config.contentTypeTemplates[contentType],
                 ...config.richMessageTypes[contentType]
             }));
@@ -157,13 +152,13 @@ export default function DynamicSMSDemo() {
         });
 
         // Send to Twilio (real SMS) - only for SMS channel and only if phone number is provided
-        let result = { success: true, demo: true, sid: 'MOCK' };
+        let result = { success: true, demo: true, sid: 'MOCK', error: undefined };
         if (selectedChannel === 'sms' && phoneNumber) {
             result = await callSMSAPI(template.apiAction, template.variables);
             addResult(
                 result.success
                     ? `✅ ${template.title} sent successfully`
-                    : `❌ Failed: ${result.error}`
+                    : `❌ Failed: ${result.error || 'Unknown error'}`
             );
         } else if (selectedChannel === 'sms' && !phoneNumber) {
             // SMS without phone number - show it's demo mode only
@@ -179,8 +174,7 @@ export default function DynamicSMSDemo() {
                 const enhancedTemplate = {
                     ...template,
                     selectedContentType,
-                    richMessageConfig: config.richMessageTypes[selectedContentType],
-                    contentTypeConfig: template.contentTypeConfig
+                    richMessageConfig: config.richMessageTypes[selectedContentType]
                 };
                 window.virtualPhoneReceiveMessage!(processedMessage, template.id, selectedChannel, enhancedTemplate);
                 addResult(`📱 Message delivered to virtual phone (${selectedChannel.toUpperCase()} - ${config.richMessageTypes[selectedContentType]?.name || 'Text'})`);
