@@ -10,7 +10,7 @@ interface DynamicMessageCardProps {
   isLoading: boolean;
   disabled: boolean;
   selectedChannel?: 'sms' | 'rcs' | 'whatsapp';
-  selectedContentType?: 'text' | 'media' | 'richCard' | 'carousel' | 'listMessage';
+  selectedContentType?: 'text' | 'media' | 'richCard' | 'carousel' | 'listMessage' | 'location' | 'catalog' | 'authentication';
   brandColors: {
     primary: string;
     secondary: string;
@@ -167,7 +167,12 @@ export default function DynamicMessageCard({
 
   const handleSaveEdit = () => {
     if (onUpdate) {
-      onUpdate(editingTemplate);
+      // Include the content type configuration in the template
+      const updatedTemplate = {
+        ...editingTemplate,
+        contentTypeConfig: contentTypeConfig
+      };
+      onUpdate(updatedTemplate);
     }
     setIsEditing(false);
   };
@@ -558,6 +563,55 @@ export default function DynamicMessageCard({
                 <p className="text-xs text-gray-600">Total items: {listSections.reduce((acc, section) => acc + section.rows.length, 0)}</p>
               </div>
             )}
+            
+            {/* Location Preview */}
+            {selectedContentType === 'location' && (
+              <div className="bg-blue-50 rounded p-2 border border-blue-200">
+                <div className="flex items-center space-x-2 mb-2">
+                  <span className="text-lg">📍</span>
+                  <span className="text-xs font-medium text-blue-800">Location Message</span>
+                </div>
+                <p className="text-xs text-gray-700"><span className="font-medium">Label:</span> {contentTypeConfig.label || 'Location'}</p>
+                <p className="text-xs text-gray-700"><span className="font-medium">Coordinates:</span> {contentTypeConfig.latitude || 37.7749}, {contentTypeConfig.longitude || -122.4194}</p>
+                <div className="mt-2 bg-blue-100 rounded p-2 text-center">
+                  <span className="text-xs text-blue-600">🗺️ Interactive map preview</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Catalog Preview */}
+            {selectedContentType === 'catalog' && (
+              <div className="bg-purple-50 rounded p-2 border border-purple-200">
+                <div className="flex items-center space-x-2 mb-2">
+                  <span className="text-lg">🛍️</span>
+                  <span className="text-xs font-medium text-purple-800">Product Catalog</span>
+                </div>
+                <p className="text-xs text-gray-700"><span className="font-medium">Title:</span> {contentTypeConfig.title || 'Shop Our Collection'}</p>
+                <p className="text-xs text-gray-700"><span className="font-medium">Catalog ID:</span> {contentTypeConfig.catalogId || 'CATALOG_ID_123'}</p>
+                {contentTypeConfig.body && <p className="text-xs text-gray-700"><span className="font-medium">Description:</span> {contentTypeConfig.body}</p>}
+                <div className="mt-2 bg-purple-100 rounded p-2 text-center">
+                  <span className="text-xs text-purple-600">🛒 Product grid preview</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Authentication Preview */}
+            {selectedContentType === 'authentication' && (
+              <div className="bg-blue-50 rounded p-2 border border-blue-200">
+                <div className="flex items-center space-x-2 mb-2">
+                  <span className="text-lg">🔐</span>
+                  <span className="text-xs font-medium text-blue-800">WhatsApp Authentication</span>
+                </div>
+                <p className="text-xs text-gray-700"><span className="font-medium">OTP Code:</span> {contentTypeConfig.otpCode || '123456'}</p>
+                <p className="text-xs text-gray-700"><span className="font-medium">Copy Button:</span> {contentTypeConfig.copyCodeText || 'Copy Code'}</p>
+                <p className="text-xs text-gray-700"><span className="font-medium">Security Warning:</span> {contentTypeConfig.addSecurityRecommendation ? 'Enabled' : 'Disabled'}</p>
+                {contentTypeConfig.codeExpirationMinutes && <p className="text-xs text-gray-700"><span className="font-medium">Expires:</span> {contentTypeConfig.codeExpirationMinutes} minutes</p>}
+                <div className="mt-2 bg-blue-100 rounded p-2 text-center">
+                  <span className="text-xs text-blue-600">🔐 Authentication UI preview</span>
+                </div>
+              </div>
+            )}
+            
             <p className="text-xs text-gray-500 mt-2 italic">Click Edit to customize these values</p>
           </div>
         </div>
@@ -1028,6 +1082,168 @@ export default function DynamicMessageCard({
                       + Add Section ({listSections.length}/10)
                     </button>
                   </div>
+                </div>
+              </>
+            )}
+            
+            {/* Location Content Type */}
+            {selectedContentType === 'location' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Latitude <span className="text-red-500">*</span></label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    min="-90"
+                    max="90"
+                    placeholder="37.7749"
+                    value={contentTypeConfig.latitude || ''}
+                    onChange={(e) => setContentTypeConfig(prev => ({ ...prev, latitude: parseFloat(e.target.value) || 0 }))}
+                    className="w-full text-xs px-2 py-1 border rounded"
+                    style={{ borderColor: brandColors.text + '30' }}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Range: -90.0 to +90.0</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Longitude <span className="text-red-500">*</span></label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    min="-180"
+                    max="180"
+                    placeholder="-122.4194"
+                    value={contentTypeConfig.longitude || ''}
+                    onChange={(e) => setContentTypeConfig(prev => ({ ...prev, longitude: parseFloat(e.target.value) || 0 }))}
+                    className="w-full text-xs px-2 py-1 border rounded"
+                    style={{ borderColor: brandColors.text + '30' }}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Range: -180.0 to +180.0</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Location Label</label>
+                  <input
+                    type="text"
+                    placeholder="San Francisco, CA"
+                    value={contentTypeConfig.label || ''}
+                    onChange={(e) => setContentTypeConfig(prev => ({ ...prev, label: e.target.value }))}
+                    className="w-full text-xs px-2 py-1 border rounded"
+                    style={{ borderColor: brandColors.text + '30' }}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Optional descriptive label for the location</p>
+                </div>
+              </>
+            )}
+            
+            {/* Catalog Content Type */}
+            {selectedContentType === 'catalog' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Catalog ID <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    placeholder="CATALOG_ID_123"
+                    value={contentTypeConfig.catalogId || ''}
+                    onChange={(e) => setContentTypeConfig(prev => ({ ...prev, catalogId: e.target.value }))}
+                    className="w-full text-xs px-2 py-1 border rounded"
+                    style={{ borderColor: brandColors.text + '30' }}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Your WhatsApp Business catalog ID</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Catalog Title</label>
+                  <input
+                    type="text"
+                    placeholder="Shop Our Collection"
+                    value={contentTypeConfig.title || ''}
+                    onChange={(e) => setContentTypeConfig(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full text-xs px-2 py-1 border rounded"
+                    style={{ borderColor: brandColors.text + '30' }}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Max 60 characters</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    placeholder="Browse our premium developer merchandise"
+                    value={contentTypeConfig.body || ''}
+                    onChange={(e) => setContentTypeConfig(prev => ({ ...prev, body: e.target.value }))}
+                    rows={2}
+                    className="w-full text-xs px-2 py-1 border rounded resize-none"
+                    style={{ borderColor: brandColors.text + '30' }}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Max 1,024 characters</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Thumbnail Item ID</label>
+                  <input
+                    type="text"
+                    placeholder="item_001"
+                    value={contentTypeConfig.thumbnailItemId || ''}
+                    onChange={(e) => setContentTypeConfig(prev => ({ ...prev, thumbnailItemId: e.target.value }))}
+                    className="w-full text-xs px-2 py-1 border rounded"
+                    style={{ borderColor: brandColors.text + '30' }}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Product ID to use as cover photo</p>
+                </div>
+              </>
+            )}
+            
+            {/* Authentication Content Type */}
+            {selectedContentType === 'authentication' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">OTP Code <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    placeholder="123456"
+                    maxLength={15}
+                    value={contentTypeConfig.otpCode || ''}
+                    onChange={(e) => setContentTypeConfig(prev => ({ ...prev, otpCode: e.target.value }))}
+                    className="w-full text-xs px-2 py-1 border rounded font-mono"
+                    style={{ borderColor: brandColors.text + '30' }}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Must be less than 15 characters</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Copy Button Text</label>
+                  <input
+                    type="text"
+                    placeholder="Copy Code"
+                    value={contentTypeConfig.copyCodeText || ''}
+                    onChange={(e) => setContentTypeConfig(prev => ({ ...prev, copyCodeText: e.target.value }))}
+                    className="w-full text-xs px-2 py-1 border rounded"
+                    style={{ borderColor: brandColors.text + '30' }}
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center space-x-2 text-xs font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={contentTypeConfig.addSecurityRecommendation !== false}
+                      onChange={(e) => setContentTypeConfig(prev => ({ ...prev, addSecurityRecommendation: e.target.checked }))}
+                      className="rounded"
+                    />
+                    <span>Add Security Warning</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">Shows "For your security, do not share this code"</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Code Expiration (minutes)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="90"
+                    placeholder="10"
+                    value={contentTypeConfig.codeExpirationMinutes || ''}
+                    onChange={(e) => setContentTypeConfig(prev => ({ ...prev, codeExpirationMinutes: parseInt(e.target.value) || undefined }))}
+                    className="w-full text-xs px-2 py-1 border rounded"
+                    style={{ borderColor: brandColors.text + '30' }}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">1-90 minutes (optional)</p>
                 </div>
               </>
             )}

@@ -28,7 +28,19 @@ export const mySampleConfig: DemoConfig = {
     availableChannels: ['sms', 'rcs', 'whatsapp', 'voice'], // Which channels to show
     defaultChannel: 'sms',         // Default selected channel
     enableContentTypes: true,      // Show content type options
-    availableContentTypes: ['text', 'richCard', 'carousel'] // Which content types to show
+    availableContentTypes: ['text', 'richCard', 'carousel'], // Which content types to show
+    voiceTemplateIds: [            // Voice-specific message template IDs
+      'outbound-call',
+      'appointment-reminder-call', 
+      'support-callback',
+      'order-confirmation-call',
+      'survey-call'
+    ],
+    phoneSettings: {               // Voice call settings
+      defaultPhoneNumber: '+1 (555) 123-4567',
+      enableRealCalls: true,       // Enable actual voice calls
+      callAutoEndTime: undefined   // undefined = manual hang up only
+    }
   },
   
   // ====== LAYOUT SETTINGS ======
@@ -383,6 +395,77 @@ export const mySampleConfig: DemoConfig = {
     }
   ],
   
+  // ====== FEATURE DEMO CARDS ======
+  featureCards: [
+    // Sample feature cards - you can customize these or add your own
+    {
+      id: "sms-delivery-tracking",
+      title: "Message Delivery Tracking",
+      description: "Real-time message status updates with webhooks",
+      emoji: "📊",
+      category: "sms-features",
+      featureType: "delivery-tracking",
+      channel: "sms",
+      demoConfig: {
+        mockBehavior: "Show delivery status progression: queued → sent → delivered",
+        virtualPhoneEffect: "Display delivery confirmation with timestamp",
+        apiResponse: {
+          status: "delivered",
+          dateUpdated: new Date().toISOString(),
+          errorCode: null
+        },
+        timeDelay: 2000,
+        persistEffect: true
+      },
+      technicalDetails: {
+        apiEndpoint: "/Messages/{MessageSid}",
+        requiredParams: ["StatusCallback"],
+        twilioFeature: "Message Status Callbacks",
+        documentation: "https://www.twilio.com/docs/messaging/webhooks"
+      },
+      messageContent: "🚀 Testing delivery tracking! You'll see status updates: queued → sent → delivered.",
+      variables: {},
+      apiAction: "delivery-tracking-demo",
+      buttonText: "Demo Delivery Tracking",
+      enabled: true
+    },
+    
+    {
+      id: "voice-text-to-speech",
+      title: "Text-to-Speech (TTS)",
+      description: "Convert text to natural-sounding speech",
+      emoji: "🗣️",
+      category: "voice-features",
+      featureType: "text-to-speech",
+      channel: "voice",
+      demoConfig: {
+        mockBehavior: "Play synthesized speech with voice selection options",
+        virtualPhoneEffect: "Show incoming call with TTS playback interface",
+        apiResponse: {
+          twimlResponse: `<Response><Say voice="alice">Hello from My Company! Your order has been processed successfully.</Say></Response>`,
+          voice: "alice",
+          language: "en-US"
+        },
+        timeDelay: 1000,
+        persistEffect: false
+      },
+      technicalDetails: {
+        apiEndpoint: "/Calls.json",
+        requiredParams: ["TwiML", "Voice"],
+        twilioFeature: "Text-to-Speech (TTS)",
+        documentation: "https://www.twilio.com/docs/voice/twiml/say"
+      },
+      messageContent: "🎙️ Converting text to speech: 'Hello from My Company! Your order has been processed successfully.' Using voice: Alice",
+      variables: {
+        voice: "alice",
+        message: "Hello from My Company! Your order has been processed successfully."
+      },
+      apiAction: "tts-demo",
+      buttonText: "Demo Text-to-Speech",
+      enabled: true
+    }
+  ],
+  
   // ====== VIRTUAL PHONE SETUP ======
   virtualPhone: {
     deviceName: "iPhone 15 Pro",
@@ -417,7 +500,30 @@ export const mySampleConfig: DemoConfig = {
         backgroundColor: "#25D366",
         textColor: "#FFFFFF"
       }
-    ]
+    ],
+    voiceSettings: {
+      autoEndCalls: false,
+      callDurationSeconds: undefined,
+      showCallHistory: true,
+      maxCallHistoryItems: 10,
+      enableMockContacts: true,
+      mockContacts: [
+        {
+          id: '1',
+          name: 'Demo Customer',
+          number: '+1 (555) 123-4567',
+          avatar: '👤',
+          company: 'My Company'
+        },
+        {
+          id: '2', 
+          name: 'Support Team',
+          number: '+1 (555) 987-6543',
+          avatar: '🛟',
+          company: 'Help Desk'
+        }
+      ]
+    }
   },
   
   // ====== MESSAGE THEMES ======
@@ -613,6 +719,61 @@ export const mySampleConfig: DemoConfig = {
           ]
         }
       ]
+    },
+    
+    location: {
+      id: "location",
+      name: "Location Share",
+      description: "Share geographic location",
+      icon: "📍",
+      available: ["whatsapp"],
+      customizable: {
+        variables: true,
+        latitude: true,
+        longitude: true,
+        label: true
+      },
+      latitude: 37.7749,
+      longitude: -122.4194,
+      label: "Business Location"
+    },
+    
+    catalog: {
+      id: "catalog",
+      name: "Product Catalog",
+      description: "Showcase product catalog",
+      icon: "🛍️",
+      available: ["whatsapp"],
+      customizable: {
+        variables: true,
+        catalogId: true,
+        title: true,
+        body: true,
+        thumbnailItemId: true
+      },
+      catalogId: "SAMPLE_CATALOG_123",
+      title: "Our Product Collection",
+      body: "Browse our latest products and services",
+      thumbnailItemId: "featured_item"
+    },
+    
+    authentication: {
+      id: "authentication",
+      name: "2FA Verification",
+      description: "Two-factor authentication codes",
+      icon: "🔐",
+      available: ["whatsapp"],
+      customizable: {
+        variables: true,
+        otpCode: true,
+        addSecurityRecommendation: true,
+        codeExpirationMinutes: true,
+        copyCodeText: true
+      },
+      otpCode: "567890",
+      addSecurityRecommendation: true,
+      codeExpirationMinutes: 5,
+      copyCodeText: "Copy Code"
     }
   },
   

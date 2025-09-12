@@ -9,6 +9,16 @@ declare global {
     virtualPhoneReceiveMessage?: (content: string, messageId?: string, channel?: 'sms' | 'rcs' | 'whatsapp' | 'voice', template?: MessageTemplate) => void;
     virtualPhoneSwitchApp?: (channel: 'sms' | 'rcs' | 'whatsapp' | 'voice') => void;
     virtualPhoneInitiateCall?: (number: string, name?: string) => void;
+    virtualPhoneStartTTSCall?: (number: string, message: string, voice?: string) => void;
+    virtualPhoneUpdateMessageStatus?: (messageId: string, status: { delivered?: boolean; read?: boolean }) => void;
+    virtualPhoneShowBrandedProfile?: (brandInfo: {
+      businessName: string;
+      logo: string;
+      verified: boolean;
+      description: string;
+      website: string;
+      phoneNumber: string;
+    }) => void;
   }
 }
 
@@ -20,13 +30,16 @@ interface Message {
   delivered: boolean;
   read: boolean;
   channel?: 'sms' | 'rcs' | 'whatsapp';
-  type?: 'text' | 'quick_replies' | 'carousel' | 'card' | 'media' | 'listMessage';
+  type?: 'text' | 'quick_replies' | 'carousel' | 'card' | 'media' | 'listMessage' | 'location' | 'catalog' | 'authentication';
   template?: MessageTemplate;
   quickReplies?: Array<{ id: string; title: string }>;
   carousel?: Array<{ id: string; image: string; title: string; subtitle: string; buttons: Array<{ title: string; type: string }> }>;
   card?: { image: string; title: string; subtitle: string; body?: string; buttons?: Array<{ title: string; type: string; url?: string; payload?: string }>; quickReplies?: Array<{ title: string; payload?: string }> };
   media?: { url: string; type: 'image' | 'video' | 'audio' | 'document'; caption?: string };
   listMessage?: { header: string; footer: string; buttonText: string; sections: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }> };
+  location?: { latitude: number; longitude: number; label?: string };
+  catalog?: { catalogId: string; title?: string; body?: string; thumbnailItemId?: string };
+  authentication?: { otpCode: string; addSecurityRecommendation?: boolean; codeExpirationMinutes?: number; copyCodeText?: string };
 }
 
 interface CallRecord {
@@ -49,9 +62,11 @@ interface Contact {
 interface VirtualPhoneProps {
   config: DemoConfig;
   onMessageReceived?: (message: Message) => void;
+  onLogMessage?: (message: string) => void;
+  selectedChannel?: 'sms' | 'rcs' | 'whatsapp' | 'voice';
 }
 
-export default function VirtualPhone({ config, onMessageReceived }: VirtualPhoneProps) {
+export default function VirtualPhone({ config, onMessageReceived, onLogMessage, selectedChannel = 'sms' }: VirtualPhoneProps) {
   const [currentApp, setCurrentApp] = useState(config.virtualPhone.defaultApp);
   const [messages, setMessages] = useState<Message[]>([]);
   const [whatsAppMessages, setWhatsAppMessages] = useState<Message[]>([]);
@@ -59,6 +74,15 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   const [currentTime, setCurrentTime] = useState(config.virtualPhone.currentTime);
   const [showContactProfile, setShowContactProfile] = useState(false);
   const [whatsAppView, setWhatsAppView] = useState<'chats' | 'chat' | 'profile'>('chats');
+  const [showBrandedProfile, setShowBrandedProfile] = useState(false);
+  const [brandedProfileData, setBrandedProfileData] = useState<{
+    businessName: string;
+    logo: string;
+    verified: boolean;
+    description: string;
+    website: string;
+    phoneNumber: string;
+  } | null>(null);
   
   // Phone app state
   const [phoneView, setPhoneView] = useState<'dialer' | 'contacts' | 'recent' | 'favorites'>('dialer');
@@ -66,6 +90,10 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
   const [isInCall, setIsInCall] = useState(false);
   const [currentCall, setCurrentCall] = useState<CallRecord | null>(null);
   const [callDuration, setCallDuration] = useState(0);
+  const [showInCallKeypad, setShowInCallKeypad] = useState(false);
+  const [currentIVRPrompt, setCurrentIVRPrompt] = useState<string | null>(null);
+  const [ivrResponses, setIvrResponses] = useState<Record<string, string>>({});
+  const [isTTSCall, setIsTTSCall] = useState(false);
   const [callHistory, setCallHistory] = useState<CallRecord[]>([
     {
       id: '1',
@@ -102,6 +130,87 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
       : []
   );
 
+  // Handler for button clicks in rich messages
+  const handleButtonClick = (button: { title: string; type: string; url?: string; payload?: string }, messageId: string) => {
+    console.log('🎯 Button clicked:', button.title, button.type, button.payload || button.url);
+    
+    // Determine which channel/app we're in based on current app state
+    const currentChannel = currentApp === 'whatsapp' ? 'whatsapp' : 'rcs';
+    
+    switch (button.type) {
+      case 'url':
+        if (onLogMessage) {
+          onLogMessage(`🎯 Button clicked: "${button.title}" → Opening URL: ${button.url}`);
+        }
+        // In a real app, this would open the URL
+        break;
+      case 'phone':
+        if (onLogMessage) {
+          onLogMessage(`🎯 Button clicked: "${button.title}" → Initiating call to: ${button.payload}`);
+        }
+        // In a real app, this would make a phone call
+        break;
+      case 'reply':
+        if (onLogMessage) {
+          onLogMessage(`🎯 Button clicked: "${button.title}" → Sending reply: ${button.payload}`);
+        }
+        // Simulate user reply
+        const userReply: Message = {
+          id: `reply_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          content: button.title,
+          timestamp: new Date(),
+          sender: 'user',
+          delivered: true,
+          read: true,
+          channel: currentChannel,
+          type: 'text'
+        };
+        
+        // Add to appropriate message state based on current app
+        if (currentApp === 'whatsapp') {
+          setWhatsAppMessages(prev => [...prev, userReply]);
+        } else {
+          setMessages(prev => [...prev, userReply]);
+        }
+        break;
+      default:
+        if (onLogMessage) {
+          onLogMessage(`🎯 Button clicked: "${button.title}" → Action: ${button.payload}`);
+        }
+    }
+  };
+
+  // Handler for quick reply clicks
+  const handleQuickReplyClick = (reply: { title: string; payload?: string }, messageId: string) => {
+    console.log('💬 Quick reply clicked:', reply.title, reply.payload);
+    
+    // Determine which channel/app we're in based on current app state
+    const currentChannel = currentApp === 'whatsapp' ? 'whatsapp' : 'rcs';
+    
+    if (onLogMessage) {
+      onLogMessage(`💬 Quick reply selected: "${reply.title}" → ${reply.payload}`);
+    }
+    
+    // Simulate user quick reply
+    const userReply: Message = {
+      id: `quick_reply_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      content: reply.title,
+      timestamp: new Date(),
+      sender: 'user',
+      delivered: true,
+      read: true,
+      channel: currentChannel,
+      type: 'text'
+    };
+    
+    // Add to appropriate message state based on current app
+    if (currentApp === 'whatsapp') {
+      setWhatsAppMessages(prev => [...prev, userReply]);
+    } else {
+      setMessages(prev => [...prev, userReply]);
+    }
+  };
+
   // Update time every minute
   useEffect(() => {
     const timer = setInterval(() => {
@@ -114,6 +223,59 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     }, 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // Auto-mark messages as read when the Messages app is visible (simulates user reading)
+  useEffect(() => {
+    if (currentApp === 'messages' && isScreenOn) {
+      const timer = setTimeout(() => {
+        // Mark unread messages as read after 2 seconds of being in the Messages app
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            !msg.read && msg.sender === 'contact' 
+              ? { ...msg, read: true }
+              : msg
+          )
+        );
+        
+        // Also trigger read receipt callbacks for RCS messages
+        const unreadRcsMessages = messages.filter(msg => 
+          !msg.read && msg.sender === 'contact' && msg.channel === 'rcs'
+        );
+        
+        if (unreadRcsMessages.length > 0 && onLogMessage) {
+          onLogMessage(`📱 Auto-read: ${unreadRcsMessages.length} RCS message(s) marked as read`);
+        }
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentApp, isScreenOn, messages, onLogMessage]);
+
+  // Auto-mark WhatsApp messages as read when the WhatsApp chat is visible
+  useEffect(() => {
+    if (currentApp === 'whatsapp' && whatsAppView === 'chat' && isScreenOn) {
+      const timer = setTimeout(() => {
+        // Mark unread WhatsApp messages as read after 2 seconds of being in the chat view
+        setWhatsAppMessages(prevMessages => 
+          prevMessages.map(msg => 
+            !msg.read && msg.sender === 'contact' 
+              ? { ...msg, read: true }
+              : msg
+          )
+        );
+        
+        const unreadWhatsAppMessages = whatsAppMessages.filter(msg => 
+          !msg.read && msg.sender === 'contact'
+        );
+        
+        if (unreadWhatsAppMessages.length > 0 && onLogMessage) {
+          onLogMessage(`📱 Auto-read: ${unreadWhatsAppMessages.length} WhatsApp message(s) marked as read`);
+        }
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentApp, whatsAppView, isScreenOn, whatsAppMessages, onLogMessage]);
 
   // Handle call duration timer
   useEffect(() => {
@@ -132,20 +294,21 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
 
   // Function to receive a new message from the demo
   const receiveMessage = useCallback((content: string, messageId?: string, channel: 'sms' | 'rcs' | 'whatsapp' | 'voice' = 'sms', template?: MessageTemplate) => {
+    console.log('📱 receiveMessage called with:', { content, messageId, channel, template: template?.id });
     // Create rich message based on template and channel
     const newMessage: Message = {
       id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       content,
       timestamp: new Date(),
       sender: 'contact',
-      delivered: true,
-      read: false,
+      delivered: true, // Messages from demo are automatically "delivered"
+      read: false,     // Start as unread, will be marked as read when user views them
       channel,
     };
 
-    // Add rich content for RCS and WhatsApp channels based on selected content type
-    if (channel === 'rcs' || channel === 'whatsapp') {
-      if (template && template.selectedContentType && template.richMessageConfig) {
+    // Add rich content for RCS, WhatsApp, and SMS (MMS) channels based on selected content type
+    if (channel === 'rcs' || channel === 'whatsapp' || (channel === 'sms' && template?.selectedContentType === 'media')) {
+      if (template && template.selectedContentType && (template.richMessageConfig || template.contentTypeConfig)) {
         // Configure rich content based on the selected type
         switch (template.selectedContentType) {
           case 'richCard':
@@ -153,10 +316,10 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             // Determine which interactive type to use - either buttons OR quick replies
             const useButtons = template.contentTypeConfig?.interactiveType !== 'quickReplies';
             newMessage.card = {
-              image: template.contentTypeConfig?.cardImage || (template.richMessageConfig.cardImage as string) || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
-              title: template.contentTypeConfig?.cardTitle || (template.richMessageConfig.cardTitle as string) || 'Special Offer!',
-              subtitle: template.contentTypeConfig?.cardSubtitle || (template.richMessageConfig.cardSubtitle as string) || 'Limited time deal - Don\'t miss out!',
-              body: template.contentTypeConfig?.cardBody || (template.richMessageConfig.cardBody as string),
+              image: template.contentTypeConfig?.cardImage || (template.richMessageConfig?.cardImage as string) || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
+              title: template.contentTypeConfig?.cardTitle || (template.richMessageConfig?.cardTitle as string) || 'Special Offer!',
+              subtitle: template.contentTypeConfig?.cardSubtitle || (template.richMessageConfig?.cardSubtitle as string) || 'Limited time deal - Don\'t miss out!',
+              body: template.contentTypeConfig?.cardBody || (template.richMessageConfig?.cardBody as string),
               buttons: useButtons ? (
                 (template.contentTypeConfig?.buttons && template.contentTypeConfig.buttons.length > 0)
                   ? template.contentTypeConfig.buttons.map(b => ({ 
@@ -165,7 +328,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                       url: b.type === 'url' ? b.payload : undefined,
                       payload: b.type !== 'url' ? b.payload : undefined 
                     }))
-                  : (template.richMessageConfig.buttons as Array<{ title: string; type: string; url?: string; payload?: string }>) || [
+                  : (template.richMessageConfig?.buttons as Array<{ title: string; type: string; url?: string; payload?: string }>) || [
                       { title: 'Shop Now', type: 'url', url: 'https://owlshop.com' },
                       { title: 'Call Us', type: 'phone', payload: '+1-833-365-9260' },
                       { title: 'More Info', type: 'reply', payload: 'more_info' }
@@ -174,7 +337,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
               quickReplies: !useButtons ? (
                 (template.contentTypeConfig?.quickReplies && template.contentTypeConfig.quickReplies.length > 0)
                   ? template.contentTypeConfig.quickReplies
-                  : (template.richMessageConfig.quickReplies as Array<{ title: string; payload?: string }>) || [
+                  : (template.richMessageConfig?.quickReplies as Array<{ title: string; payload?: string }>) || [
                       { title: 'Yes, I\'m interested', payload: 'interested' },
                       { title: 'Not now', payload: 'not_now' },
                       { title: 'Tell me more', payload: 'more_info' }
@@ -184,10 +347,11 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             break;
             
           case 'carousel':
+            newMessage.type = 'carousel';
             // Use user-defined carousel items if available, otherwise fallback to defaults
             newMessage.carousel = (template.contentTypeConfig?.carouselItems && template.contentTypeConfig.carouselItems.length > 0)
               ? template.contentTypeConfig.carouselItems
-              : (template.richMessageConfig.items as Array<{ id: string; image: string; title: string; subtitle: string; buttons: Array<{ title: string; type: string }> }>) || [
+              : (template.richMessageConfig?.items as Array<{ id: string; image: string; title: string; subtitle: string; buttons: Array<{ title: string; type: string }> }>) || [
                   {
                     id: '1',
                     image: '🦉',
@@ -214,24 +378,22 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             
           case 'media':
             newMessage.type = 'media';
-            if (template.contentTypeConfig) {
-              newMessage.media = {
-                url: template.contentTypeConfig.mediaUrl || (template.richMessageConfig.mediaUrl as string) || '',
-                type: template.contentTypeConfig.mediaType || (template.richMessageConfig.mediaType as 'image' | 'video' | 'audio' | 'document') || 'image',
-                caption: template.contentTypeConfig.caption || (template.richMessageConfig.caption as string) || ''
-              };
-            }
+            newMessage.media = {
+              url: template.contentTypeConfig?.mediaUrl || (template.richMessageConfig?.mediaUrl as string) || '',
+              type: template.contentTypeConfig?.mediaType || (template.richMessageConfig?.mediaType as 'image' | 'video' | 'audio' | 'document') || 'image',
+              caption: template.contentTypeConfig?.caption || (template.richMessageConfig?.caption as string) || ''
+            };
             break;
             
           case 'listMessage':
             newMessage.type = 'listMessage';
             newMessage.listMessage = {
-              header: template.contentTypeConfig?.listHeader || (template.richMessageConfig.header as string) || 'Choose Your Product Category',
-              footer: template.contentTypeConfig?.listFooter || (template.richMessageConfig.footer as string) || 'Select an option to continue',
-              buttonText: template.contentTypeConfig?.buttonText || (template.richMessageConfig.buttonText as string) || 'View Products',
+              header: template.contentTypeConfig?.listHeader || (template.richMessageConfig?.header as string) || 'Choose Your Product Category',
+              footer: template.contentTypeConfig?.listFooter || (template.richMessageConfig?.footer as string) || 'Select an option to continue',
+              buttonText: template.contentTypeConfig?.buttonText || (template.richMessageConfig?.buttonText as string) || 'View Products',
               sections: (template.contentTypeConfig?.listSections && template.contentTypeConfig.listSections.length > 0)
                 ? template.contentTypeConfig.listSections
-                : (template.richMessageConfig.sections as Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>) || [
+                : (template.richMessageConfig?.sections as Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>) || [
                     {
                       title: "Clothing",
                       rows: [
@@ -247,6 +409,37 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                       ]
                     }
                   ]
+            };
+            break;
+            
+          case 'location':
+            newMessage.type = 'location';
+            newMessage.location = {
+              latitude: template.contentTypeConfig?.latitude || (template.richMessageConfig?.latitude as number) || 37.7749,
+              longitude: template.contentTypeConfig?.longitude || (template.richMessageConfig?.longitude as number) || -122.4194,
+              label: template.contentTypeConfig?.label || (template.richMessageConfig?.label as string) || 'Location'
+            };
+            break;
+            
+          case 'catalog':
+            newMessage.type = 'catalog';
+            newMessage.catalog = {
+              catalogId: template.contentTypeConfig?.catalogId || (template.richMessageConfig?.catalogId as string) || 'CATALOG_ID_123',
+              title: template.contentTypeConfig?.title || (template.richMessageConfig?.title as string) || 'Shop Our Collection',
+              body: template.contentTypeConfig?.body || (template.richMessageConfig?.body as string) || 'Browse our premium products',
+              thumbnailItemId: template.contentTypeConfig?.thumbnailItemId || (template.richMessageConfig?.thumbnailItemId as string)
+            };
+            break;
+            
+          case 'authentication':
+            newMessage.type = 'authentication';
+            newMessage.authentication = {
+              otpCode: template.contentTypeConfig?.otpCode || (template.richMessageConfig?.otpCode as string) || '123456',
+              addSecurityRecommendation: template.contentTypeConfig?.addSecurityRecommendation !== undefined 
+                ? template.contentTypeConfig.addSecurityRecommendation 
+                : (template.richMessageConfig?.addSecurityRecommendation as boolean) ?? true,
+              codeExpirationMinutes: template.contentTypeConfig?.codeExpirationMinutes || (template.richMessageConfig?.codeExpirationMinutes as number) || 10,
+              copyCodeText: template.contentTypeConfig?.copyCodeText || (template.richMessageConfig?.copyCodeText as string) || 'Copy Code'
             };
             break;
             
@@ -276,7 +469,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
       // Voice channel should initiate a call instead of sending a message
       const number = config.features.phoneSettings.defaultPhoneNumber;
       const name = 'Demo Call';
-      initiateCall(number);
+      initiateCall(number, template);
       
       // Switch to Phone app
       if (currentApp !== 'phone') {
@@ -329,6 +522,59 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     }
   }, [isScreenOn, whatsAppMessages.length]);
 
+  // Function to update message status (for read receipts, delivery confirmations, etc.)
+  const updateMessageStatus = useCallback((messageId: string, status: { delivered?: boolean; read?: boolean }) => {
+    console.log('📱 updateMessageStatus called with:', { messageId, status });
+    
+    // Update messages in the SMS/RCS app
+    setMessages(prevMessages => 
+      prevMessages.map(msg => 
+        msg.id === messageId || msg.id.includes(messageId)
+          ? { ...msg, ...status }
+          : msg
+      )
+    );
+    
+    // Update messages in the WhatsApp app
+    setWhatsAppMessages(prevMessages => 
+      prevMessages.map(msg => 
+        msg.id === messageId || msg.id.includes(messageId)
+          ? { ...msg, ...status }
+          : msg
+      )
+    );
+    
+    // Log the status update
+    if (onLogMessage) {
+      const statusText = status.read ? 'read (✓✓)' : status.delivered ? 'delivered (✓)' : 'updated';
+      onLogMessage(`📱 Message status updated: ${statusText}`);
+    }
+  }, [onLogMessage]);
+
+  // Function to show branded business profile
+  const showBrandedProfileInfo = useCallback((brandInfo: {
+    businessName: string;
+    logo: string;
+    verified: boolean;
+    description: string;
+    website: string;
+    phoneNumber: string;
+  }) => {
+    console.log('🏢 showBrandedProfile called with:', brandInfo);
+    setBrandedProfileData(brandInfo);
+    setShowBrandedProfile(true);
+    setShowContactProfile(false); // Hide regular contact profile
+    
+    // Ensure we're in the Messages app
+    if (currentApp !== 'messages') {
+      setCurrentApp('messages');
+    }
+    
+    if (onLogMessage) {
+      onLogMessage(`🏢 Branded profile displayed: ${brandInfo.businessName} ${brandInfo.verified ? '✅' : '❌'}`);
+    }
+  }, [currentApp, onLogMessage]);
+
   // Expose functions globally for the demo to use
   useEffect(() => {
     window.virtualPhoneReceiveMessage = receiveMessage;
@@ -337,13 +583,22 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
       initiateCall(number);
       setCurrentApp('phone');
     };
+    window.virtualPhoneStartTTSCall = (number: string, message: string, voice?: string) => {
+      startTTSCall(number, message, voice);
+      setCurrentApp('phone');
+    };
+    window.virtualPhoneUpdateMessageStatus = updateMessageStatus;
+    window.virtualPhoneShowBrandedProfile = showBrandedProfileInfo;
     
     return () => {
       delete window.virtualPhoneReceiveMessage;
       delete window.virtualPhoneSwitchApp;
       delete window.virtualPhoneInitiateCall;
+      delete window.virtualPhoneStartTTSCall;
+      delete window.virtualPhoneUpdateMessageStatus;
+      delete window.virtualPhoneShowBrandedProfile;
     };
-  }, [receiveMessage, switchApp]);
+  }, [receiveMessage, switchApp, updateMessageStatus, showBrandedProfileInfo]);
 
   const currentTheme = getMessageTheme(config, config.virtualPhone.messageTheme);
 
@@ -392,11 +647,28 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
       <div className="flex-1 p-4 bg-white overflow-y-auto">
         <div className="text-center mb-6">
           {/* Profile Avatar */}
-          <div className="w-20 h-20 bg-gray-300 rounded-full mx-auto mb-3 flex items-center justify-center text-2xl">
+          <div className={`w-20 h-20 rounded-full mx-auto mb-3 flex items-center justify-center text-2xl ${
+            selectedChannel === 'rcs' ? 'bg-blue-100' : 'bg-gray-300'
+          }`}>
             🏪
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">{config.virtualPhone.contactName}</h2>
+          
+          {/* Contact Name with Verification Badge for RCS */}
+          <div className="flex items-center justify-center space-x-2 mb-2">
+            <h2 className="text-lg font-semibold text-gray-900">{config.virtualPhone.contactName}</h2>
+            {selectedChannel === 'rcs' && (
+              <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs">✓</span>
+              </div>
+            )}
+          </div>
+          
           <p className="text-sm text-gray-500">{config.virtualPhone.phoneNumber}</p>
+          
+          {/* RCS Business Status */}
+          {selectedChannel === 'rcs' && (
+            <p className="text-xs text-blue-600 font-medium mt-1">✅ Verified Business</p>
+          )}
         </div>
 
         {/* Contact Actions */}
@@ -510,8 +782,32 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
               className="text-center flex-1 mx-2 hover:bg-gray-200 rounded-lg p-1 transition-colors"
               onClick={() => setShowContactProfile(true)}
             >
-              <h3 className="font-semibold text-sm text-gray-900 truncate">{config.virtualPhone.contactName}</h3>
-              <p className="text-xs text-gray-500 truncate">{config.virtualPhone.phoneNumber}</p>
+              <div className="flex items-center justify-center space-x-2">
+                {/* Show contact image and verified badge for RCS channel */}
+                {selectedChannel === 'rcs' && (
+                  <>
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm">🏢</span>
+                    </div>
+                    <div className="text-center min-w-0">
+                      <div className="flex items-center justify-center space-x-1">
+                        <h3 className="font-semibold text-sm text-gray-900 truncate">{config.virtualPhone.contactName}</h3>
+                        <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 truncate">{config.virtualPhone.phoneNumber}</p>
+                    </div>
+                  </>
+                )}
+                {/* Show regular header for non-RCS channels */}
+                {selectedChannel !== 'rcs' && (
+                  <div className="text-center">
+                    <h3 className="font-semibold text-sm text-gray-900 truncate">{config.virtualPhone.contactName}</h3>
+                    <p className="text-xs text-gray-500 truncate">{config.virtualPhone.phoneNumber}</p>
+                  </div>
+                )}
+              </div>
             </button>
             <div className="w-8" />
           </div>
@@ -531,7 +827,8 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             ) : (
               messages.map((message) => {
                 const isUser = message.sender === 'user';
-                const isRichMessage = message.channel === 'rcs' && message.type !== 'text';
+                const isRichMessage = (message.channel === 'rcs' && message.type !== 'text') || 
+                                     (message.channel === 'sms' && message.type === 'media');
                 
                 return (
                   <div key={message.id} className="flex flex-col">
@@ -604,6 +901,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                             {message.quickReplies?.map((reply) => (
                               <button
                                 key={reply.id}
+                                onClick={() => handleQuickReplyClick(reply, message.id)}
                                 className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs hover:bg-blue-200"
                               >
                                 {reply.title}
@@ -647,6 +945,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                                 {message.card?.buttons.map((button, idx) => (
                                   <button
                                     key={idx}
+                                    onClick={() => handleButtonClick(button, message.id)}
                                     className={`flex-1 text-white text-xs py-2 rounded hover:opacity-80 ${
                                       button.type === 'url' ? 'bg-blue-500' : 
                                       button.type === 'phone' ? 'bg-green-500' : 'bg-gray-500'
@@ -668,6 +967,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                                 {message.card?.quickReplies.map((reply, idx) => (
                                   <button
                                     key={idx}
+                                    onClick={() => handleQuickReplyClick(reply, message.id)}
                                     className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200"
                                     title={reply.payload}
                                   >
@@ -712,6 +1012,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                                 {item.buttons.map((button, idx) => (
                                   <button
                                     key={idx}
+                                    onClick={() => handleButtonClick(button, message.id)}
                                     className="w-full bg-green-500 text-white text-xs py-1 rounded hover:bg-green-600 mb-1"
                                   >
                                     {button.title}
@@ -744,6 +1045,27 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                         {currentTheme.showDeliveryStatus && isUser && (
                           <span className="ml-1">
                             {message.delivered ? (message.read ? '✓✓' : '✓') : '⏱'}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Read Receipt Status for RCS/WhatsApp messages from contacts */}
+                    {!isUser && (message.channel === 'rcs' || message.channel === 'whatsapp') && (
+                      <div className={`text-xs mt-1 ${
+                        isUser ? 'self-end' : 'self-start'
+                      }`}>
+                        {message.delivered && message.read ? (
+                          <span className="text-blue-600 font-medium">
+                            ✓✓ Read
+                          </span>
+                        ) : message.delivered ? (
+                          <span className="text-gray-500">
+                            ✓ Delivered
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">
+                            ⏱ Sending...
                           </span>
                         )}
                       </div>
@@ -798,7 +1120,8 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     }
   };
 
-  const initiateCall = (number: string) => {
+  const initiateCall = (number: string, template?: MessageTemplate) => {
+    console.log('📞 Initiating call with template:', template?.id, template?.title);
     const call: CallRecord = {
       id: Date.now().toString(),
       number: formatPhoneNumber(number),
@@ -807,6 +1130,134 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     };
     setCurrentCall(call);
     setIsInCall(true);
+    setShowInCallKeypad(false);
+    setIsTTSCall(false); // Reset TTS state for regular calls
+    
+    // Set up IVR prompts based on the voice template
+    if (template) {
+      console.log('📞 Setting up IVR with template ID:', template.id);
+      setupIVRPrompts(template);
+    } else {
+      console.log('📞 No template provided for IVR setup');
+    }
+  };
+
+  const startTTSCall = (number: string, message: string, voice: string = 'Alice') => {
+    console.log('🗣️ Starting TTS call:', { number, message, voice });
+    const call: CallRecord = {
+      id: Date.now().toString(),
+      number: formatPhoneNumber(number),
+      name: `🗣️ TTS Demo - ${voice}`,
+      type: 'outgoing',
+      timestamp: new Date()
+    };
+    setCurrentCall(call);
+    setIsInCall(true);
+    setShowInCallKeypad(false);
+    setIsTTSCall(true); // Enable TTS visual mode
+    setCurrentIVRPrompt(`🎙️ Converting to speech: "${message}"`);
+  };
+
+  const setupIVRPrompts = (template: MessageTemplate) => {
+    console.log('📞 Setting up IVR prompts for template:', template.id, template.title);
+    // Define IVR responses based on template type
+    const ivrPrompts: Record<string, Record<string, string>> = {
+      'interactive-ivr': {
+        '1': '📞 Connecting to Sales Department...',
+        '2': '🎧 Connecting to Customer Support...',
+        '3': '💳 Connecting to Billing Department...',
+        '4': '📋 Playing company directory...',
+        '9': '🔄 Returning to main menu...',
+        '0': '👨‍💼 Connecting to operator...'
+      },
+      'voice-survey-interactive': {
+        '1': '⭐ Rating: 1 - Thank you for your feedback. We\'ll work to improve.',
+        '2': '⭐⭐ Rating: 2 - We appreciate your input and will address your concerns.',
+        '3': '⭐⭐⭐ Rating: 3 - Thank you! We\'ll continue to enhance our service.',
+        '4': '⭐⭐⭐⭐ Rating: 4 - Great! We\'re glad you had a positive experience.',
+        '5': '⭐⭐⭐⭐⭐ Rating: 5 - Excellent! Thank you for being a valued customer.',
+        '9': '🎤 Recording your voice message now... Press # when finished.'
+      },
+      'appointment-reminder-voice': {
+        '1': '✅ Appointment confirmed. Thank you!',
+        '2': '📅 Connecting to reschedule your appointment...',
+        '3': '❌ Appointment cancelled. We\'ll send confirmation.',
+        '0': '🏥 Connecting to our office...'
+      },
+      'payment-reminder-voice': {
+        '1': '💳 Processing payment now...',
+        '2': '📞 Connecting to billing department...',
+        '3': '📧 Email payment options sent to your account.',
+        '9': '🔄 Repeating payment information...'
+      }
+    };
+
+    const responses = ivrPrompts[template.id] || {
+      '1': '✅ Option 1 selected',
+      '2': '✅ Option 2 selected', 
+      '3': '✅ Option 3 selected',
+      '0': '👨‍💼 Connecting to operator...'
+    };
+    
+    setIvrResponses(responses);
+    setCurrentIVRPrompt(template.messageContent);
+    console.log('📞 IVR setup complete. Responses:', Object.keys(responses), 'Prompt:', template.messageContent);
+  };
+
+  const handleDialerKeypadInput = (digit: string) => {
+    if (digit === 'delete') {
+      setDialedNumber(prev => prev.slice(0, -1));
+    } else if (digit === 'call') {
+      if (dialedNumber) {
+        initiateCall(dialedNumber);
+      }
+    } else {
+      setDialedNumber(prev => prev + digit);
+    }
+  };
+
+  const handleInCallKeypadInput = (digit: string) => {
+    console.log('🎯 IVR Keypad pressed:', digit);
+    // Handle DTMF tones during call
+    const response = ivrResponses[digit];
+    if (response) {
+      console.log('🎯 IVR Response:', response);
+      
+      // Log to activity feed directly
+      if (onLogMessage) {
+        onLogMessage(`🎯 IVR Input: Pressed ${digit} → ${response}`);
+      }
+      
+      // Also send as virtual phone message
+      if (onMessageReceived) {
+        const ivrMessage: Message = {
+          id: `ivr_${Date.now()}`,
+          content: `🎯 IVR Input: Pressed ${digit} - ${response}`,
+          timestamp: new Date(),
+          sender: 'contact',
+          delivered: true,
+          read: false,
+          channel: 'voice',
+          type: 'text'
+        };
+        onMessageReceived(ivrMessage);
+      }
+      
+      // Update current prompt to show response
+      setCurrentIVRPrompt(response);
+      
+      // Auto-hide keypad after successful selection (but not immediately)
+      setTimeout(() => {
+        console.log('🎯 Hiding keypad after response');
+      }, 3000);
+    } else {
+      console.log('❌ Invalid IVR key:', digit);
+      // Invalid key pressed
+      setCurrentIVRPrompt(`❌ Invalid selection: ${digit}. Please try again.`);
+      if (onLogMessage) {
+        onLogMessage(`❌ IVR Error: Invalid key "${digit}" pressed`);
+      }
+    }
   };
 
   const endCall = (duration?: number) => {
@@ -821,6 +1272,10 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     setCurrentCall(null);
     setIsInCall(false);
     setDialedNumber('');
+    setShowInCallKeypad(false);
+    setCurrentIVRPrompt(null);
+    setIvrResponses({});
+    setIsTTSCall(false); // Reset TTS state
   };
 
   const renderPhoneApp = () => {
@@ -904,7 +1359,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
           ].map(([digit, letters]) => (
             <button
               key={digit}
-              onClick={() => handleDialerInput(digit)}
+              onClick={() => handleDialerKeypadInput(digit)}
               className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 active:bg-gray-300 transition-colors flex flex-col items-center justify-center"
             >
               <span className="text-xs font-semibold text-gray-900">{digit}</span>
@@ -917,7 +1372,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
         <div className="flex justify-center items-center mt-2 space-x-3">
           {dialedNumber ? (
             <button
-              onClick={() => handleDialerInput('delete')}
+              onClick={() => handleDialerKeypadInput('delete')}
               className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 active:bg-gray-300 transition-colors flex items-center justify-center"
             >
               <span className="text-xs">⌫</span>
@@ -927,7 +1382,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
           )}
           
           <button
-            onClick={() => handleDialerInput('call')}
+            onClick={() => handleDialerKeypadInput('call')}
             disabled={!dialedNumber}
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
               dialedNumber 
@@ -1056,32 +1511,97 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     };
 
     return (
-      <div className="flex-1 flex flex-col bg-gradient-to-b from-green-400 to-green-600 text-white">
+      <div className="flex-1 flex flex-col bg-gradient-to-b from-green-400 to-green-600 text-white overflow-hidden">
         {/* Call Info */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4">
-          <div className="text-center mb-6">
-            <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center mb-3 mx-auto">
-              <span className="text-4xl">👤</span>
+        <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-y-auto">
+          <div className="text-center mb-4">
+            {/* Enhanced avatar for TTS calls */}
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-3 mx-auto relative ${
+              isTTSCall ? 'bg-gradient-to-r from-blue-500 to-purple-500 animate-pulse shadow-lg' : 'bg-white bg-opacity-20'
+            }`}>
+              <span className="text-4xl">
+                {isTTSCall ? '🗣️' : currentIVRPrompt ? '🎙️' : '👤'}
+              </span>
+              {/* TTS Visual Indicator */}
+              {isTTSCall && (
+                <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center animate-bounce">
+                  <span className="text-white text-sm">🔊</span>
+                </div>
+              )}
             </div>
+            
             <h2 className="text-lg font-light mb-1">
-              {currentCall.name || 'Unknown Contact'}
+              {isTTSCall ? '🎙️ Text-to-Speech Demo' : currentCall.name || 'Demo Voice Call'}
             </h2>
             <p className="text-sm opacity-90 mb-1">{currentCall.number}</p>
             <p className="text-xs opacity-75">
-              {currentCall.type === 'incoming' ? 'Incoming call' : 'Connected'}
+              {isTTSCall ? '🔊 VOICE SYNTHESIS ACTIVE' : 
+               currentCall.type === 'incoming' ? 'Incoming call' : 'Connected'}
             </p>
             <p className="text-lg font-mono mt-2">{formatDuration(callDuration)}</p>
+            
+            {/* TTS Status Display */}
+            {isTTSCall && (
+              <div className="mt-4 bg-gradient-to-r from-blue-500 to-purple-500 bg-opacity-30 rounded-xl p-4 max-w-xs border-2 border-white border-opacity-50">
+                <div className="flex items-center justify-center space-x-3 mb-3">
+                  <span className="text-2xl animate-pulse">🎵</span>
+                  <p className="text-lg font-bold text-yellow-200">VOICE SYNTHESIS</p>
+                  <span className="text-2xl animate-pulse">🎵</span>
+                </div>
+                <p className="text-sm opacity-90 mb-3 text-center font-medium">🎙️ Converting text to natural speech...</p>
+                <div className="flex items-center justify-center space-x-2 mb-3">
+                  <div className="w-3 h-3 bg-yellow-300 rounded-full animate-bounce"></div>
+                  <div className="w-3 h-3 bg-yellow-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-3 h-3 bg-yellow-300 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+                <div className="text-center bg-white bg-opacity-20 rounded-lg p-2">
+                  <p className="text-xs font-bold text-yellow-200">🗣️ Voice: Alice</p>
+                  <p className="text-xs font-bold text-yellow-200">🌍 Language: en-US</p>
+                </div>
+              </div>
+            )}
+            
+            {/* IVR Prompt Display */}
+            {currentIVRPrompt && (
+              <div className="mt-3 bg-white bg-opacity-20 rounded-lg p-2 max-w-xs">
+                <p className="text-xs font-medium mb-1">🎯 IVR Prompt:</p>
+                <p className="text-sm leading-relaxed">{currentIVRPrompt}</p>
+              </div>
+            )}
+
+            {/* IVR Keypad - Always visible when IVR active */}
+            {Object.keys(ivrResponses).length > 0 && (
+              <div className="mt-3 bg-white bg-opacity-10 rounded-lg p-2">
+                <p className="text-xs text-center mb-2 opacity-75">Press a key to respond:</p>
+                <div className="grid grid-cols-3 gap-1 max-w-[90px] mx-auto">
+                  {Object.keys(ivrResponses).map((digit) => (
+                    <button
+                      key={digit}
+                      onClick={() => handleInCallKeypadInput(digit)}
+                      className="w-6 h-6 rounded bg-white bg-opacity-30 hover:bg-opacity-50 active:bg-opacity-70 transition-colors flex items-center justify-center"
+                    >
+                      <span className="text-xs font-semibold text-white">{digit}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-center mt-1 opacity-50">
+                  Available: {Object.keys(ivrResponses).join(', ')}
+                </p>
+              </div>
+            )}
+            
+            {/* Debug Info */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mt-2 text-xs opacity-50">
+                IVR: {currentIVRPrompt ? 'Yes' : 'No'} | Responses: {Object.keys(ivrResponses).length}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Call Controls */}
-        <div className="p-4">
-          <div className="flex justify-center items-center space-x-4">
-            {/* Mute */}
-            <button className="w-12 h-12 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center transition-colors">
-              <span className="text-lg">🔇</span>
-            </button>
-            
+        {/* Call Controls - Fixed at bottom */}
+        <div className="flex-shrink-0 p-4 bg-gradient-to-t from-black from-opacity-10">
+          <div className="flex justify-center items-center">
             {/* End Call */}
             <button
               onClick={() => endCall(callDuration)}
@@ -1090,17 +1610,12 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
             >
               <span className="text-2xl">📞</span>
             </button>
-            
-            {/* Speaker */}
-            <button className="w-12 h-12 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center transition-colors">
-              <span className="text-lg">🔊</span>
-            </button>
           </div>
 
           {/* Additional Controls */}
           <div className="flex justify-center items-center space-x-4 mt-3">
             <button className="w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center transition-colors">
-              <span className="text-sm">⌨️</span>
+              <span className="text-sm">🎤</span>
             </button>
             <button className="w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center transition-colors">
               <span className="text-sm">➕</span>
@@ -1292,6 +1807,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                   {message.quickReplies?.map((reply: { id: string; title: string }) => (
                     <button
                       key={reply.id}
+                      onClick={() => handleQuickReplyClick(reply, message.id)}
                       className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs hover:bg-green-200"
                     >
                       {reply.title}
@@ -1332,6 +1848,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                       {item.buttons.map((button: { title: string; type: string }, idx: number) => (
                         <button
                           key={idx}
+                          onClick={() => handleButtonClick(button, message.id)}
                           className="w-full bg-green-500 text-white text-xs py-1 rounded hover:bg-green-600 mb-1"
                         >
                           {button.title}
@@ -1376,6 +1893,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                       {message.card?.buttons.map((button: { title: string; type: string; url?: string; payload?: string }, idx: number) => (
                         <button
                           key={idx}
+                          onClick={() => handleButtonClick(button, message.id)}
                           className={`flex-1 text-white text-xs py-2 rounded hover:opacity-80 ${
                             button.type === 'url' ? 'bg-blue-500' : 
                             button.type === 'phone' ? 'bg-green-600' : 'bg-green-500'
@@ -1397,6 +1915,7 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                       {message.card?.quickReplies.map((reply: { title: string; payload?: string }, idx: number) => (
                         <button
                           key={idx}
+                          onClick={() => handleQuickReplyClick(reply, message.id)}
                           className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded hover:bg-green-200"
                           title={reply.payload}
                         >
@@ -1464,6 +1983,95 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
               </div>
             )}
 
+            {message.type === 'location' && message.location && (
+              <div>
+                <p className="text-sm mb-2 break-words">{message.content}</p>
+                <div className="bg-white rounded-lg border border-gray-300 p-3">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <span className="text-2xl">📍</span>
+                    <div>
+                      <h4 className="font-semibold text-sm text-gray-900">{message.location?.label || 'Location'}</h4>
+                      <p className="text-xs text-gray-600">
+                        {message.location?.latitude}, {message.location?.longitude}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="bg-gray-100 rounded p-2 text-center text-xs text-gray-600">
+                    🗺️ Interactive map would display here
+                  </div>
+                  <button className="w-full mt-2 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 transition-colors">
+                    View in Maps
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {message.type === 'catalog' && message.catalog && (
+              <div>
+                <p className="text-sm mb-2 break-words">{message.content}</p>
+                <div className="bg-white rounded-lg border border-gray-300 overflow-hidden">
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 px-3 py-2 border-b border-gray-200">
+                    <h4 className="font-semibold text-sm text-gray-900 flex items-center">
+                      <span className="mr-2">🛍️</span>
+                      {message.catalog?.title || 'Product Catalog'}
+                    </h4>
+                    {message.catalog?.body && (
+                      <p className="text-xs text-gray-600 mt-1">{message.catalog?.body}</p>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {['Owl Hoodie', 'Dev T-Shirt', 'Code Mug', 'Stickers'].map((item, idx) => (
+                        <div key={idx} className="bg-gray-50 rounded p-2 text-center">
+                          <div className="text-lg mb-1">{['🦉', '👔', '☕', '💻'][idx]}</div>
+                          <p className="text-xs font-medium">{item}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <button className="w-full py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors">
+                      Browse Catalog
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {message.type === 'authentication' && message.authentication && (
+              <div>
+                <div className="bg-white rounded-lg border border-gray-300 overflow-hidden">
+                  <div className="bg-blue-50 px-3 py-2 border-b border-gray-200">
+                    <h4 className="font-semibold text-sm text-gray-900 flex items-center">
+                      <span className="mr-2">🔐</span>
+                      WhatsApp Authentication
+                    </h4>
+                  </div>
+                  <div className="p-3">
+                    <p className="text-sm text-gray-700 mb-3">
+                      Your verification code is:
+                    </p>
+                    <div className="bg-gray-100 rounded-lg p-3 text-center mb-3">
+                      <span className="text-2xl font-mono font-bold text-gray-900">
+                        {message.authentication?.otpCode}
+                      </span>
+                    </div>
+                    <button className="w-full py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors mb-2">
+                      {message.authentication?.copyCodeText || 'Copy Code'}
+                    </button>
+                    {message.authentication?.addSecurityRecommendation && (
+                      <p className="text-xs text-gray-500 text-center">
+                        For your security, do not share this code
+                      </p>
+                    )}
+                    {message.authentication?.codeExpirationMinutes && (
+                      <p className="text-xs text-gray-500 text-center mt-1">
+                        Code expires in {message.authentication.codeExpirationMinutes} minutes
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className={`text-xs mt-1 ${isUser ? 'text-green-100' : 'text-gray-500'} flex items-center justify-end`}>
               <span>
                 {message.timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
@@ -1474,6 +2082,25 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
                 </span>
               )}
             </div>
+            
+            {/* Read Receipt Status for WhatsApp messages from contacts */}
+            {!isUser && message.channel === 'whatsapp' && (
+              <div className="text-xs mt-1 text-gray-500 flex items-center justify-start">
+                {message.delivered && message.read ? (
+                  <span className="text-blue-600 font-medium">
+                    ✓✓ Read
+                  </span>
+                ) : message.delivered ? (
+                  <span className="text-gray-500">
+                    ✓ Delivered
+                  </span>
+                ) : (
+                  <span className="text-gray-400">
+                    ⏱ Sending...
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       );
@@ -1602,7 +2229,138 @@ export default function VirtualPhone({ config, onMessageReceived }: VirtualPhone
     );
   };
 
+  const renderBrandedProfile = () => (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Branded Profile Header */}
+      <div className="bg-gray-100 border-b border-gray-200 p-3 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <button 
+            onClick={() => setShowBrandedProfile(false)}
+            className="text-blue-500 text-sm"
+          >
+            {config.uiText.virtualPhone.back}
+          </button>
+          <h3 className="font-semibold text-sm text-gray-900">Business Profile</h3>
+          <div className="w-8" />
+        </div>
+      </div>
+
+      {/* Branded Profile Content */}
+      <div className="flex-1 p-4 bg-white overflow-y-auto">
+        {brandedProfileData && (
+          <>
+            {/* Business Header */}
+            <div className="text-center mb-6">
+              {/* Business Logo */}
+              <div className="w-20 h-20 mx-auto mb-3 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                {brandedProfileData.logo.startsWith('http') ? (
+                  <img 
+                    src={brandedProfileData.logo} 
+                    alt={brandedProfileData.businessName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'block';
+                    }}
+                  />
+                ) : null}
+                <div className={`text-2xl ${brandedProfileData.logo.startsWith('http') ? 'hidden' : 'block'}`}>
+                  🏢
+                </div>
+              </div>
+              
+              {/* Business Name with Verification */}
+              <div className="flex items-center justify-center space-x-2 mb-2">
+                <h2 className="text-lg font-semibold text-gray-900">{brandedProfileData.businessName}</h2>
+                {brandedProfileData.verified && (
+                  <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                )}
+              </div>
+              
+              <p className="text-sm text-gray-500">{brandedProfileData.phoneNumber}</p>
+              {brandedProfileData.verified && (
+                <p className="text-xs text-blue-600 font-medium mt-1">✅ Verified Business</p>
+              )}
+            </div>
+
+            {/* Business Description */}
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-gray-900 mb-2">About</h3>
+              <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg leading-relaxed">
+                {brandedProfileData.description}
+              </p>
+            </div>
+
+            {/* Contact Actions */}
+            <div className="space-y-3 mb-6">
+              <button 
+                className="w-full flex items-center p-3 bg-green-50 rounded-lg border border-green-200 hover:bg-green-100 transition-colors"
+                onClick={() => setShowBrandedProfile(false)}
+              >
+                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-white text-sm">💬</span>
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-900">Message</p>
+                  <p className="text-xs text-gray-500">Send a text message</p>
+                </div>
+              </button>
+
+              <button className="w-full flex items-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-white text-sm">📞</span>
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-900">Call</p>
+                  <p className="text-xs text-gray-500">{brandedProfileData.phoneNumber}</p>
+                </div>
+              </button>
+
+              <button className="w-full flex items-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-white text-sm">🌐</span>
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-900">Website</p>
+                  <p className="text-xs text-gray-500">{brandedProfileData.website}</p>
+                </div>
+              </button>
+            </div>
+
+            {/* Business Trust Indicators */}
+            {brandedProfileData.verified && (
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Trust & Safety</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <span className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center mr-2">
+                      <span className="text-white text-xs">✓</span>
+                    </span>
+                    <span className="text-xs text-gray-600">Verified Business Account</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mr-2">
+                      <span className="text-white text-xs">🛡️</span>
+                    </span>
+                    <span className="text-xs text-gray-600">Secure RCS Messaging</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+
   const renderCurrentApp = () => {
+    // Show branded profile overlay when requested
+    if (showBrandedProfile && currentApp === 'messages') {
+      return renderBrandedProfile();
+    }
+    
     // Show contact profile overlay when requested
     if (showContactProfile && currentApp === 'messages') {
       return renderContactProfile();
