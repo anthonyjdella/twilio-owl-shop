@@ -87,24 +87,40 @@ Owl Shop is a fully functional online clothing store that demonstrates how moder
 
 ## 🎨 Customization
 
-**For customer demos**, customize the dynamic demo in `config/demo-config.ts`:
+### **🛍️ Store Customization** 
+**Transform the entire e-commerce store** in `config/store-config.ts`:
 
 ```typescript
-// Brand for your customer
-title: "ACME CORP COMMUNICATION DEMO",
-brandName: "ACME Corp",
+// Rebrand the entire store
+storeName: "ACME Store",
+storeTagline: "Premium ACME Products",
 brandColors: {
   primary: "#FF6B35"  // Customer's brand color
-}
+},
 
-// Virtual phone branding
+// Customize SMS messages
+smsSettings: {
+  welcomeMessage: "Welcome to ACME Store! 🎉",
+  orderConfirmationMessage: "Thanks for your ACME order! 📦"
+}
+```
+
+### **📱 Communication Demo Customization**
+**Customize the demo showcase** in `config/demo-config.ts`:
+
+```typescript
+// Brand the demo interface
+title: "ACME CORP COMMUNICATION DEMO",
+brandName: "ACME Corp",
 virtualPhone: {
   contactName: "ACME Customer Service",
   phoneNumber: "+1 (555) ACME-HELP"
 }
 ```
 
-**Need detailed customization?** → **[Complete Configuration Guide](CONFIG-GUIDE.md)**
+### **📚 Documentation**
+- **[Store Customization Guide](STORE-CUSTOMIZATION.md)** - Transform the entire e-commerce experience
+- **[Communication Demo Guide](CONFIG-GUIDE.md)** - Customize the feature showcase
 
 ## 🛠️ Technology Stack
 
