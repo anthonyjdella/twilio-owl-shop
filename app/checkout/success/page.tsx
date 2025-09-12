@@ -8,7 +8,7 @@ import {
     TruckIcon,
     ChatBubbleLeftEllipsisIcon,
 } from "@heroicons/react/24/outline";
-import { sendShippingUpdate } from "../../../lib/twilio";
+// Removed direct Twilio import to avoid client-side Node.js module issues
 import { Order } from "../../../types";
 
 function CheckoutSuccessContent() {
@@ -29,12 +29,19 @@ function CheckoutSuccessContent() {
                 setTimeout(async () => {
                     if (foundOrder.contactInfo.phone) {
                         try {
-                            await sendShippingUpdate(
-                                foundOrder.contactInfo.phone,
-                                foundOrder.id,
-                                "shipped",
-                                foundOrder.trackingNumber
-                            );
+                            const response = await fetch('/api/sms', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    action: 'shipping-update',
+                                    phoneNumber: foundOrder.contactInfo.phone,
+                                    orderNumber: foundOrder.id,
+                                    status: "shipped",
+                                    trackingNumber: foundOrder.trackingNumber
+                                }),
+                            });
                         } catch (error) {
                             console.error(
                                 "Failed to send shipping update:",

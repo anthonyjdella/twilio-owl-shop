@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { products } from "@/data/products";
 import ProductCard from "@/components/ui/ProductCard";
-import { sendMarketingMessage } from "@/lib/twilio";
+// Removed direct Twilio import to avoid client-side Node.js module issues
 
 export default function Home() {
     const [email, setEmail] = useState("");
@@ -33,10 +33,21 @@ export default function Home() {
         // Send welcome SMS if consented
         if (smsConsent && phone) {
             try {
-                await sendMarketingMessage(
-                    phone,
-                    `Welcome to Owl Shop! 🦉✨ Thank you for joining our VIP list. Get ready for exclusive deals, early access to new arrivals, and style tips. Reply STOP to opt out.`
-                );
+                const response = await fetch('/api/sms', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'marketing',
+                        phoneNumber: phone,
+                        message: `Welcome to Owl Shop! 🦉✨ Thank you for joining our VIP list. Get ready for exclusive deals, early access to new arrivals, and style tips. Reply STOP to opt out.`
+                    }),
+                });
+                
+                if (!response.ok) {
+                    throw new Error('SMS API call failed');
+                }
             } catch {
                 console.log("SMS service unavailable in demo mode");
             }

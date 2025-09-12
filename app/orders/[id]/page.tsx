@@ -11,11 +11,7 @@ import {
     ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
 import { Order } from "../../../types";
-import {
-    sendShippingUpdate,
-    sendDeliveryConfirmation,
-    sendSurveyRequest,
-} from "../../../lib/twilio";
+// Removed direct Twilio import to avoid client-side Node.js module issues
 
 interface TrackingUpdate {
     status: string;
@@ -112,30 +108,51 @@ export default function OrderTrackingPage() {
             if (order.contactInfo.phone) {
                 try {
                     if (updates[i].status === "shipped") {
-                        await sendShippingUpdate(
-                            order.contactInfo.phone,
-                            order.id,
-                            "shipped",
-                            order.trackingNumber
-                        );
+                        await fetch('/api/sms', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'shipping-update',
+                                phoneNumber: order.contactInfo.phone,
+                                orderNumber: order.id,
+                                status: "shipped",
+                                trackingNumber: order.trackingNumber
+                            })
+                        });
                     } else if (updates[i].status === "out-for-delivery") {
-                        await sendShippingUpdate(
-                            order.contactInfo.phone,
-                            order.id,
-                            "out for delivery"
-                        );
+                        await fetch('/api/sms', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'shipping-update',
+                                phoneNumber: order.contactInfo.phone,
+                                orderNumber: order.id,
+                                status: "out for delivery"
+                            })
+                        });
                     } else if (updates[i].status === "delivered") {
-                        await sendDeliveryConfirmation(
-                            order.contactInfo.phone,
-                            order.id
-                        );
+                        await fetch('/api/sms', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'shipping-update',
+                                phoneNumber: order.contactInfo.phone,
+                                orderNumber: order.id,
+                                status: "delivered"
+                            })
+                        });
 
                         // Send survey request after delivery
                         setTimeout(async () => {
-                            await sendSurveyRequest(
-                                order.contactInfo.phone!,
-                                order.id
-                            );
+                            await fetch('/api/sms', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    action: 'post-purchase-survey',
+                                    phoneNumber: order.contactInfo.phone!,
+                                    orderNumber: order.id
+                                })
+                            });
                         }, 3000);
                     }
                 } catch (error) {

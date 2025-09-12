@@ -10,11 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { CartItem, Address } from "../../types";
 import { getCartTotal, calculateTax, calculateShipping } from "../../lib/cart";
-import {
-    sendOrderConfirmation,
-    validatePhoneNumber,
-    formatPhoneNumber,
-} from "../../lib/twilio";
+// Removed direct Twilio import to avoid client-side Node.js module issues
 
 export default function CheckoutPage() {
     const router = useRouter();
@@ -119,17 +115,24 @@ export default function CheckoutPage() {
         const orderNumber = generateOrderNumber();
 
         // Send SMS confirmation if consent given and phone provided
-        if (
-            smsConsent &&
-            contactInfo.phone &&
-            validatePhoneNumber(contactInfo.phone)
-        ) {
+        if (smsConsent && contactInfo.phone) {
             try {
-                await sendOrderConfirmation(
-                    contactInfo.phone,
-                    orderNumber,
-                    total
-                );
+                const response = await fetch('/api/sms', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'order-confirmation',
+                        phoneNumber: contactInfo.phone,
+                        orderNumber: orderNumber,
+                        total: total
+                    }),
+                });
+                
+                if (!response.ok) {
+                    throw new Error('SMS API call failed');
+                }
             } catch (error) {
                 console.error("Failed to send SMS:", error);
             }
@@ -707,9 +710,7 @@ export default function CheckoutPage() {
                                                 <p>{contactInfo.email}</p>
                                                 {contactInfo.phone && (
                                                     <p>
-                                                        {formatPhoneNumber(
-                                                            contactInfo.phone
-                                                        )}
+                                                        {contactInfo.phone}
                                                     </p>
                                                 )}
                                             </div>
