@@ -15,15 +15,17 @@ Owl Shop is a fully functional online clothing store that demonstrates how moder
 
 ## 🎭 Two Demo Experiences
 
-### 1. **Classic E-commerce Demo** (`/`)
-**Full shopping experience with integrated SMS**
+### 1. **Classic E-commerce Demo** (`/`) - **CTK Compliance Toolkit**
+**Full shopping experience with REAL SMS integration**
 - Browse and purchase products like a real customer
-- Experience SMS notifications throughout the journey:
+- **Sends actual SMS messages** to real phone numbers (when Twilio credentials configured)
+- Complete customer journey with real SMS notifications:
   - Welcome messages for new customers
   - Cart abandonment reminders  
   - Order confirmations and shipping updates
   - Post-purchase surveys
-- Perfect for showing **real-world SMS integration**
+- **TCPA-compliant SMS consent** and opt-out management
+- Perfect for demonstrating **real-world SMS compliance and integration**
 
 ### 2. **Dynamic Communication Demo** (`/dynamic-sms-demo`)
 **Customizable Twilio feature showcase**
@@ -132,12 +134,15 @@ virtualPhone: {
 
 ## 🎭 Demo Scenarios
 
-### **E-commerce SMS Journey**
+### **E-commerce SMS Journey** (Real SMS Messages)
 1. Customer browses products at `/`
-2. Abandons cart → receives SMS reminder
-3. Completes purchase → gets order confirmation SMS
-4. Package ships → receives tracking SMS with link
-5. Delivery complete → SMS survey for feedback
+2. Provides phone number → **real welcome SMS sent**
+3. Abandons cart → **real SMS reminder sent to their phone**
+4. Completes purchase → **real order confirmation SMS**
+5. Package ships → **real tracking SMS with link**
+6. Delivery complete → **real SMS survey for feedback**
+
+**Note**: Requires Twilio credentials for real SMS. Without credentials, runs in demo mode.
 
 ### **Communication Feature Showcase**
 1. Open `/dynamic-sms-demo`
@@ -148,12 +153,19 @@ virtualPhone: {
 
 ## 🚀 Getting Started
 
-### **For E-commerce Demo**
+### **For E-commerce Demo** (Real SMS Testing)
 1. Start at homepage (`/`)
 2. Browse products and add to cart
-3. Go through checkout process
-4. Check SMS notifications in console/logs
-5. Track order status at `/orders/[id]`
+3. **Enter your real phone number** during checkout
+4. Complete purchase → **receive real SMS confirmation**
+5. **Check your phone** for actual SMS messages
+6. Track order status at `/orders/[id]` → **receive real shipping updates**
+
+**CTK Compliance Features:**
+- ✅ **TCPA-compliant opt-in** during checkout
+- ✅ **Clear consent language** for SMS marketing
+- ✅ **Easy opt-out** instructions in every message
+- ✅ **Frequency disclosure** and terms
 
 ### **For Communication Demo**
 1. Go to `/dynamic-sms-demo`
